@@ -1,0 +1,788 @@
+﻿@page "/bios-config"
+@page "/bios-config/{ExtractedPath}"
+@using System.IO
+@using System.Web
+@using Microsoft.Maui.Storage
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+
+<div class="bios-container">
+    <h3>BIOS Configuration</h3>
+    <p class="intro-text">Please select the BIOS files for each gaming system. These files are required for proper emulation.</p>
+
+    @if (!string.IsNullOrEmpty(extractedPath))
+    {
+        <div class="path-info">
+            <p><strong>NextUI Installation Path:</strong> @extractedPath</p>
+        </div>
+    }
+
+    <div class="systems-list">
+        @foreach (var system in biosSystems)
+        {
+            <div class="system-card">
+                <div class="system-header">
+                    <h4>@system.SystemName</h4>
+                    <span class="system-code">(@system.SystemCode)</span>
+                </div>
+
+                <div class="bios-files">
+                    @foreach (var biosFile in system.BiosFiles)
+                    {
+                        <div class="bios-file-row">
+                            <div class="file-info">
+                                <span class="file-name">@biosFile.FileName</span>
+                                <span class="file-path">@biosFile.ExpectedPath</span>
+                            </div>
+
+                            <div class="file-actions">
+                                @if (!string.IsNullOrEmpty(biosFile.SelectedPath))
+                                {
+                                    <div class="file-status">
+                                        <span class="status-icon selected">✓</span>
+                                        <span class="selected-path" title="@biosFile.SelectedPath">
+                                            @Path.GetFileName(biosFile.SelectedPath)
+                                        </span>
+                                        <button class="btn btn-sm btn-secondary" @onclick="() => ClearSelection(biosFile)">
+                                            Clear
+                                        </button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="file-status">
+                                        <span class="status-icon missing">○</span>
+                                        <span class="missing-text">Not selected</span>
+                                    </div>
+                                }
+
+                                <button class="btn btn-primary" @onclick="() => SelectBiosFile(biosFile)" disabled="@isSelectingFile">
+                                    @if (isSelectingFile && currentSelectingFile == biosFile.Id)
+                                    {
+                                        <span>Selecting...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Select File</span>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="summary-section">
+        <div class="summary-stats">
+            <p>
+                <strong>Files Selected:</strong> @selectedFilesCount of @totalFilesCount
+                (@(selectedFilesCount == totalFilesCount ? "Complete" : $"{totalFilesCount - selectedFilesCount} missing"))
+            </p>
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn btn-secondary" @onclick="ClearAllSelections">Clear All</button>
+            <button class="btn btn-success" @onclick="CopyFilesToBiosDirectories" disabled="@(selectedFilesCount == 0 || isCopying)">
+                @if (isCopying)
+                {
+                    <span>@copyProgress</span>
+                }
+                else
+                {
+                    <span>Copy Selected Files (@selectedFilesCount)</span>
+                }
+            </button>
+            <button class="btn btn-info" @onclick="SkipBiosSetup">Skip BIOS Setup</button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="status-message @(isSuccess ? "success" : "error")">
+            @statusMessage
+        </div>
+    }
+
+    @if (isCopying)
+    {
+        <div class="copy-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: @(copyPercentage)%"></div>
+            </div>
+            <p class="progress-text">@copyStatus</p>
+        </div>
+    }
+</div>
+
+<style>
+    .bios-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .intro-text {
+        color: #586069;
+        margin-bottom: 20px;
+        font-size: 1.1em;
+    }
+
+    .path-info {
+        background: #f1f8ff;
+        border: 1px solid #c8e1ff;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 20px;
+    }
+
+        .path-info p {
+            margin: 0;
+            color: #0366d6;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.9em;
+        }
+
+    .systems-list {
+        margin-bottom: 30px;
+    }
+
+    .system-card {
+        background: #f6f8fa;
+        border: 1px solid #d0d7de;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        overflow: hidden;
+    }
+
+    .system-header {
+        background: #24292e;
+        color: white;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+        .system-header h4 {
+            margin: 0;
+            font-size: 1.2em;
+        }
+
+    .system-code {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+    }
+
+    .bios-files {
+        padding: 16px;
+    }
+
+    .bios-file-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        background: white;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        margin-bottom: 8px;
+    }
+
+    .file-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .file-name {
+        font-weight: 600;
+        color: #24292e;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+    }
+
+    .file-path {
+        font-size: 0.85em;
+        color: #586069;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+    }
+
+    .file-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .file-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 160px;
+    }
+
+    .status-icon {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+    }
+
+        .status-icon.selected {
+            background: #28a745;
+            color: white;
+        }
+
+        .status-icon.missing {
+            background: #e1e4e8;
+            color: #586069;
+            border: 2px solid #d0d7de;
+        }
+
+    .selected-path {
+        color: #28a745;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 0.9em;
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .missing-text {
+        color: #d73a49;
+        font-size: 0.9em;
+    }
+
+    .btn {
+        padding: 8px 12px;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #f6f8fa;
+        color: #24292e;
+        text-decoration: none;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+        .btn:hover {
+            background: #f3f4f6;
+            border-color: #d0d7de;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+    .btn-primary {
+        background: #2da44e;
+        color: white;
+        border-color: #2da44e;
+    }
+
+        .btn-primary:hover {
+            background: #2c974b;
+            border-color: #2c974b;
+        }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border-color: #6c757d;
+    }
+
+        .btn-secondary:hover {
+            background: #5c636a;
+            border-color: #5c636a;
+        }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+        border-color: #28a745;
+    }
+
+        .btn-success:hover {
+            background: #218838;
+            border-color: #1e7e34;
+        }
+
+    .btn-info {
+        background: #17a2b8;
+        color: white;
+        border-color: #17a2b8;
+    }
+
+        .btn-info:hover {
+            background: #138496;
+            border-color: #117a8b;
+        }
+
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 12px;
+    }
+
+    .summary-section {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+
+    .summary-stats {
+        margin-bottom: 15px;
+    }
+
+        .summary-stats p {
+            margin: 0;
+            font-size: 1.1em;
+            color: #495057;
+        }
+
+    .action-buttons {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .status-message {
+        margin-top: 20px;
+        padding: 12px;
+        border-radius: 6px;
+        font-weight: 500;
+    }
+
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+    .copy-progress {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+
+    .progress-bar {
+        width: 100%;
+        height: 20px;
+        background: #e9ecef;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 10px;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #28a745, #20c997);
+        transition: width 0.3s ease;
+        border-radius: 10px;
+    }
+
+    .progress-text {
+        margin: 0;
+        text-align: center;
+        color: #495057;
+        font-size: 0.9em;
+    }
+
+    media (max-width: 768px) {
+        .bios-file-row
+
+    {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+
+    .file-actions {
+        justify-content: space-between;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+    }
+
+    .btn {
+        justify-content: center;
+    }
+
+    }
+</style>
+
+@code {
+    [Parameter] public string? ExtractedPath { get; set; }
+
+    private string extractedPath = "";
+    private bool isSelectingFile = false;
+    private string currentSelectingFile = "";
+    private bool isCopying = false;
+    private string copyProgress = "";
+    private string copyStatus = "";
+    private int copyPercentage = 0;
+    private string statusMessage = "";
+    private bool isSuccess = false;
+
+    private int selectedFilesCount => biosSystems.SelectMany(s => s.BiosFiles).Count(f => !string.IsNullOrEmpty(f.SelectedPath));
+    private int totalFilesCount => biosSystems.SelectMany(s => s.BiosFiles).Count();
+
+    private List<BiosSystem> biosSystems = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Get the extracted path from route parameter or query string
+        if (!string.IsNullOrEmpty(ExtractedPath))
+        {
+            extractedPath = Uri.UnescapeDataString(ExtractedPath);
+        }
+        else
+        {
+            // Try to get from query string as fallback
+            var uri = new Uri(Navigation.Uri);
+            var query = uri.Query;
+            if (!string.IsNullOrEmpty(query))
+            {
+                var queryParams = HttpUtility.ParseQueryString(query);
+                var pathParam = queryParams["path"];
+                if (!string.IsNullOrEmpty(pathParam))
+                {
+                    extractedPath = pathParam;
+                }
+            }
+        }
+
+        InitializeBiosSystems();
+    }
+
+    private void InitializeBiosSystems()
+    {
+        biosSystems = new List<BiosSystem>
+        {
+            new BiosSystem
+            {
+                SystemName = "NES/Famicom",
+                SystemCode = "FC",
+                BiosFiles = new List<BiosFile>
+                {
+                    new BiosFile
+                    {
+                        Id = "fc_disksys",
+                        FileName = "disksys.rom",
+                        ExpectedPath = $"{extractedPath}/Bios/FC/disksys.rom"
+                    }
+                }
+            },
+            new BiosSystem
+            {
+                SystemName = "Game Boy",
+                SystemCode = "GB",
+                BiosFiles = new List<BiosFile>
+                {
+                    new BiosFile
+                    {
+                        Id = "gb_bios",
+                        FileName = "gb_bios.bin",
+                        ExpectedPath = $"{extractedPath}/Bios/GB/gb_bios.bin"
+                    }
+                }
+            },
+            new BiosSystem
+            {
+                SystemName = "Game Boy Color",
+                SystemCode = "GBC",
+                BiosFiles = new List<BiosFile>
+                {
+                    new BiosFile
+                    {
+                        Id = "gbc_bios",
+                        FileName = "gbc_bios.bin",
+                        ExpectedPath = $"{extractedPath}/Bios/GBC/gbc_bios.bin"
+                    }
+                }
+            },
+            new BiosSystem
+            {
+                SystemName = "Game Boy Advance",
+                SystemCode = "GBA / MGBA",
+                BiosFiles = new List<BiosFile>
+                {
+                    new BiosFile
+                    {
+                        Id = "gba_bios",
+                        FileName = "gba_bios.bin",
+                        ExpectedPath = $"{extractedPath}/Bios/GBA/gba_bios.bin"
+                    },
+                    new BiosFile
+                    {
+                        Id = "gba_bios",
+                        FileName = "gba_bios.bin",
+                        ExpectedPath = $"{extractedPath}/Bios/MGBA/gba_bios.bin"
+                    }
+                }
+            },
+            new BiosSystem
+            {
+                SystemName = "Mega Drive / Genesis / Sega CD",
+                SystemCode = "MD / Sega CD",
+                BiosFiles = new List<BiosFile>
+                {
+                    new BiosFile
+                    {
+                        Id = "md_bios_cd_e",
+                        FileName = "bios_CD_E.bin",
+                        ExpectedPath = $"{extractedPath}/Bios/MD/bios_CD_E.bin"
+                    },
+                    new BiosFile
+                    {
+                        Id = "md_bios_cd_j",
+                        FileName = "bios_CD_J.bin",
+                        ExpectedPath = $"{extractedPath}/Bios/MD/bios_CD_J.bin"
+                    },
+                    new BiosFile
+                    {
+                        Id = "md_bios_cd_u",
+                        FileName = "bios_CD_U.bin",
+                        ExpectedPath = $"{extractedPath}/Bios/MD/bios_CD_U.bin"
+                    },
+                    new BiosFile
+                    {
+                        Id = "segacd_bios_cd_e",
+                        FileName = "bios_CD_E.bin",
+                        ExpectedPath = $"{extractedPath}/Bios/SEGACD/bios_CD_E.bin"
+                    },
+                    new BiosFile
+                    {
+                        Id = "segacd_bios_cd_j",
+                        FileName = "bios_CD_J.bin",
+                        ExpectedPath = $"{extractedPath}/Bios/SEGACD/bios_CD_J.bin"
+                    },
+                    new BiosFile
+                    {
+                        Id = "segacd_bios_cd_u",
+                        FileName = "bios_CD_U.bin",
+                        ExpectedPath = $"{extractedPath}/Bios/SEGACD/bios_CD_U.bin"
+                    }
+                }
+            },
+            new BiosSystem
+            {
+                SystemName = "PC Engine",
+                SystemCode = "PCE",
+                BiosFiles = new List<BiosFile>
+                {
+                    new BiosFile
+                    {
+                        Id = "pce_syscard3",
+                        FileName = "syscard3.pce",
+                        ExpectedPath = $"{extractedPath}/Bios/PCE/syscard3.pce"
+                    }
+                }
+            },
+            new BiosSystem
+            {
+                SystemName = "Sony PlayStation",
+                SystemCode = "PS",
+                BiosFiles = new List<BiosFile>
+                {
+                    new BiosFile
+                    {
+                        Id = "ps_psxonpsp660",
+                        FileName = "psxonpsp660.bin",
+                        ExpectedPath = $"{extractedPath}/Bios/PS/psxonpsp660.bin"
+                    }
+                }
+            }
+        };
+    }
+
+    private async Task SelectBiosFile(BiosFile biosFile)
+    {
+        try
+        {
+            isSelectingFile = true;
+            currentSelectingFile = biosFile.Id;
+            StateHasChanged();
+
+            var customFileType = new FilePickerFileType(
+                new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.iOS, new[] { "public.data" } },
+                    { DevicePlatform.Android, new[] { "*/*" } },
+                    { DevicePlatform.WinUI, new[] { "*" } },
+                    { DevicePlatform.Tizen, new[] { "*/*" } },
+                    { DevicePlatform.macOS, new[] { "*" } },
+                    { DevicePlatform.MacCatalyst, new[] { "*" } },
+                });
+
+            var options = new PickOptions()
+            {
+                PickerTitle = $"Select {biosFile.FileName}",
+                FileTypes = customFileType,
+            };
+
+            var fileResult = await FilePicker.Default.PickAsync(options);
+
+            if (fileResult != null)
+            {
+                biosFile.SelectedPath = fileResult.FullPath;
+                statusMessage = $"Selected: {Path.GetFileName(fileResult.FullPath)} for {biosFile.FileName}";
+                isSuccess = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error selecting file: {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isSelectingFile = false;
+            currentSelectingFile = "";
+            StateHasChanged();
+        }
+    }
+
+    private void ClearSelection(BiosFile biosFile)
+    {
+        biosFile.SelectedPath = "";
+        StateHasChanged();
+    }
+
+    private void ClearAllSelections()
+    {
+        foreach (var system in biosSystems)
+        {
+            foreach (var biosFile in system.BiosFiles)
+            {
+                biosFile.SelectedPath = "";
+            }
+        }
+        statusMessage = "All selections cleared.";
+        isSuccess = true;
+        StateHasChanged();
+    }
+
+    private async Task CopyFilesToBiosDirectories()
+    {
+        var selectedFiles = biosSystems
+            .SelectMany(s => s.BiosFiles)
+            .Where(f => !string.IsNullOrEmpty(f.SelectedPath))
+            .ToList();
+
+        if (selectedFiles.Count == 0)
+        {
+            statusMessage = "No files selected to copy.";
+            isSuccess = false;
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            isCopying = true;
+            copyPercentage = 0;
+            copyProgress = "Copying...";
+            copyStatus = "Preparing to copy files...";
+            StateHasChanged();
+
+            for (int i = 0; i < selectedFiles.Count; i++)
+            {
+                var biosFile = selectedFiles[i];
+                copyStatus = $"Copying {biosFile.FileName} ({i + 1} of {selectedFiles.Count})";
+                copyPercentage = (int)((i * 100) / selectedFiles.Count);
+                StateHasChanged();
+
+                // Create directory if it doesn't exist
+                var destinationDirectory = Path.GetDirectoryName(biosFile.ExpectedPath);
+                if (!string.IsNullOrEmpty(destinationDirectory))
+                {
+                    Directory.CreateDirectory(destinationDirectory);
+                }
+
+                // Copy the file
+                File.Copy(biosFile.SelectedPath, biosFile.ExpectedPath, true);
+
+                // Small delay for UI feedback
+                await Task.Delay(200);
+            }
+
+            copyPercentage = 100;
+            copyProgress = "Complete!";
+            copyStatus = "All selected files copied successfully";
+            statusMessage = $"Successfully copied {selectedFiles.Count} BIOS file(s) to their respective directories.";
+            isSuccess = true;
+            StateHasChanged();
+
+            // Reset after 3 seconds
+            await Task.Delay(3000);
+            isCopying = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            isCopying = false;
+            statusMessage = $"Error copying files: {ex.Message}";
+            isSuccess = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SkipBiosSetup()
+    {
+        statusMessage = "BIOS setup skipped. You can configure BIOS files later through the emulator settings.";
+        isSuccess = true;
+        StateHasChanged();
+
+        // In a real app, you'd navigate to the next page or complete the setup
+        await Task.Delay(2000);
+        // Navigation.NavigateTo("/setup-complete"); // Example navigation
+    }
+
+    // Method to set the extracted path (call this when navigating from the release page)
+    public void SetExtractedPath(string path)
+    {
+        extractedPath = path;
+        InitializeBiosSystems(); // Reinitialize with the correct paths
+        StateHasChanged();
+    }
+
+    public class BiosSystem
+    {
+        public string SystemName { get; set; } = "";
+        public string SystemCode { get; set; } = "";
+        public List<BiosFile> BiosFiles { get; set; } = new();
+    }
+
+    public class BiosFile
+    {
+        public string Id { get; set; } = "";
+        public string FileName { get; set; } = "";
+        public string ExpectedPath { get; set; } = "";
+        public string SelectedPath { get; set; } = "";
+    }
+}

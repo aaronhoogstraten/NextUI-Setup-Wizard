@@ -1,0 +1,956 @@
+﻿@page "/release-info"
+@using System.Net.Http
+@using System.Text.RegularExpressions
+@using System.IO.Compression
+@using System.Security.Cryptography
+@using CommunityToolkit.Maui.Storage
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<div class="release-container">
+    <h3>Latest NextUI Release</h3>
+    
+    @if (isLoading)
+    {
+        <div class="loading">
+            <p>Loading release information...</p>
+        </div>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="error">
+            <p>Error: @errorMessage</p>
+            <button class="btn btn-primary" @onclick="LoadReleaseInfo">Retry</button>
+        </div>
+    }
+    else if (latestRelease != null)
+    {
+        <div class="release-info">
+            <div class="release-header">
+                <h4>@latestRelease.Name</h4>
+                <span class="tag-name">@latestRelease.TagName</span>
+                @if (latestRelease.IsPrerelease)
+                {
+                    <span class="prerelease-badge">Pre-release</span>
+                }
+            </div>
+            
+            <div class="release-meta">
+                <p><strong>Author:</strong> @latestRelease.Author</p>
+                <p><strong>Published:</strong> @latestRelease.PublishedDate</p>
+            </div>
+            
+            @if (!string.IsNullOrEmpty(latestRelease.Body))
+            {
+                <div class="release-notes">
+                    <h5>Release Notes:</h5>
+                    <div class="notes-content">
+                        @((MarkupString)FormatReleaseNotes(latestRelease.Body))
+                    </div>
+                </div>
+            }
+            
+            @if (latestRelease.Assets?.Any() == true)
+            {
+                <div class="assets">
+                    <h5>Downloads:</h5>
+                    <ul>
+                        @foreach (var asset in latestRelease.Assets)
+                        {
+                            <li>
+                                <a href="@asset.Url" target="_blank">
+                                    @asset.Name
+                                </a>
+                                @if (!string.IsNullOrEmpty(asset.Sha256))
+                                {
+                                    <span class="asset-info">
+                                        <span class="sha-badge" title="SHA256: @asset.Sha256">✓ Verified</span>
+                                    </span>
+                                }
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+            else
+            {
+                <div class="no-assets">
+                    <p><em>No downloadable assets found in this release.</em></p>
+                </div>
+            }
+            
+            <div class="actions">
+                <a href="@latestRelease.Url" target="_blank" class="btn btn-primary">View on GitHub</a>
+                <button class="btn btn-secondary" @onclick="LoadReleaseInfo">Refresh</button>
+                @{
+                    var allZipAsset = GetAllZipAsset();
+                }
+                @if (allZipAsset != null)
+                {
+                    <button class="btn btn-success" @onclick="DownloadAndExtractRelease" disabled="@isDownloading">
+                        @if (isDownloading)
+                        {
+                            <span>@downloadProgress</span>
+                        }
+                        else
+                        {
+                            <span>Download & Extract (@allZipAsset.Name)</span>
+                        }
+                    </button>
+                }
+                else if (latestRelease.Assets?.Any() == true)
+                {
+                    <div class="no-all-zip">
+                        <p><em>No *-all.zip file found in assets. Available files:</em></p>
+                        <ul class="asset-list">
+                            @foreach (var asset in latestRelease.Assets)
+                            {
+                                <li>@asset.Name</li>
+                            }
+                        </ul>
+                    </div>
+                }
+                else
+                {
+                    <div class="no-assets-debug">
+                        <p><em>No assets detected. This might be a parsing issue.</em></p>
+                        <button class="btn btn-info" @onclick="ShowDebugInfo">Show Debug Info</button>
+                    </div>
+                }
+            </div>
+            
+            @if (isDownloading)
+            {
+                <div class="download-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: @(downloadPercentage)%"></div>
+                    </div>
+                    <p class="progress-text">@downloadStatus</p>
+                </div>
+            }
+            
+            @if (!string.IsNullOrEmpty(downloadMessage))
+            {
+                <div class="download-message @(downloadSuccess ? "success" : "error")">
+                    @downloadMessage
+                </div>
+            }
+            
+            @if (showDebugInfo && latestRelease != null)
+            {
+                <div class="debug-info">
+                    <h5>Debug Information:</h5>
+                    <div class="debug-content">
+                        <p><strong>Release Name:</strong> @(latestRelease.Name ?? "Not found")</p>
+                        <p><strong>Tag Name:</strong> @(latestRelease.TagName ?? "Not found")</p>
+                        <p><strong>Assets Count:</strong> @(latestRelease.Assets?.Count ?? 0)</p>
+                        <p><strong>Raw HTML Length:</strong> @rawHtmlLength characters</p>
+                        @if (latestRelease.Assets?.Any() == true)
+                        {
+                            <p><strong>Found Assets:</strong></p>
+                            <ul>
+                                @foreach (var asset in latestRelease.Assets)
+                                {
+                                    <li>@asset.Name (@asset.Url)</li>
+                                }
+                            </ul>
+                        }
+                        <button class="btn btn-secondary" @onclick="() => showDebugInfo = false">Hide Debug</button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .release-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .loading, .error {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+    }
+    
+    .error {
+        color: #d73a49;
+    }
+    
+    .release-header {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+    
+    .release-header h4 {
+        margin: 0;
+        color: #0366d6;
+        font-size: 1.5em;
+    }
+    
+    .tag-name {
+        background: #f1f8ff;
+        color: #0366d6;
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 0.9em;
+    }
+    
+    .prerelease-badge {
+        padding: 4px 8px;
+        border-radius: 6px;
+        font-size: 0.8em;
+        font-weight: bold;
+        background: #fff3cd;
+        color: #856404;
+    }
+    
+    .release-meta {
+        background: #f6f8fa;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+    }
+    
+    .release-meta p {
+        margin: 5px 0;
+        color: #586069;
+    }
+    
+    .release-notes {
+        margin-bottom: 20px;
+    }
+    
+    .release-notes h5 {
+        color: #24292e;
+        margin-bottom: 10px;
+    }
+    
+    .notes-content {
+        background: #f6f8fa;
+        padding: 15px;
+        border-radius: 6px;
+        border-left: 4px solid #0366d6;
+        overflow-x: auto;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .assets {
+        margin-bottom: 20px;
+    }
+    
+    .assets h5 {
+        color: #24292e;
+        margin-bottom: 10px;
+    }
+    
+    .assets ul {
+        list-style: none;
+        padding: 0;
+    }
+    
+    .assets li {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        background: #f6f8fa;
+        margin-bottom: 5px;
+        border-radius: 6px;
+    }
+    
+    .assets a {
+        color: #0366d6;
+        text-decoration: none;
+        font-weight: 500;
+    }
+    
+    .assets a:hover {
+        text-decoration: underline;
+    }
+    
+    .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    
+    .btn {
+        padding: 10px 16px;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #f6f8fa;
+        color: #24292e;
+        text-decoration: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s;
+    }
+    
+    .btn:hover {
+        background: #f3f4f6;
+        border-color: #d0d7de;
+    }
+    
+    .btn-primary {
+        background: #2da44e;
+        color: white;
+        border-color: #2da44e;
+    }
+    
+    .btn-primary:hover {
+        background: #2c974b;
+        border-color: #2c974b;
+    }
+    
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border-color: #6c757d;
+    }
+    
+    .btn-secondary:hover {
+        background: #5c636a;
+        border-color: #5c636a;
+    }
+    
+    .btn-success {
+        background: #28a745;
+        color: white;
+        border-color: #28a745;
+    }
+    
+    .btn-success:hover {
+        background: #218838;
+        border-color: #1e7e34;
+    }
+    
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+    
+    .download-progress {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+    
+    .progress-bar {
+        width: 100%;
+        height: 20px;
+        background: #e9ecef;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 10px;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #28a745, #20c997);
+        transition: width 0.3s ease;
+        border-radius: 10px;
+    }
+    
+    .progress-text {
+        margin: 0;
+        text-align: center;
+        color: #495057;
+        font-size: 0.9em;
+    }
+    
+    .download-message {
+        margin-top: 15px;
+        padding: 12px;
+        border-radius: 6px;
+        font-weight: 500;
+    }
+    
+    .download-message.success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .download-message.error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    .sha-badge {
+        background: #28a745;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.75em;
+        font-weight: bold;
+        margin-left: 8px;
+    }
+    
+    .no-all-zip, .no-assets-debug {
+        margin-top: 15px;
+        padding: 12px;
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+        border-radius: 6px;
+    }
+    
+    .asset-list {
+        list-style: disc;
+        margin-left: 20px;
+        margin-top: 8px;
+    }
+    
+    .btn-info {
+        background: #17a2b8;
+        color: white;
+        border-color: #17a2b8;
+    }
+    
+    .btn-info:hover {
+        background: #138496;
+        border-color: #117a8b;
+    }
+    
+    .debug-info {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+    }
+    
+    .debug-content {
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 0.9em;
+    }
+    
+    .debug-content ul {
+        list-style: disc;
+        margin-left: 20px;
+    }
+</style>
+
+@code {
+    private GitHubRelease? latestRelease;
+    private bool isLoading = true;
+    private string? errorMessage;
+    private bool isDownloading = false;
+    private string downloadProgress = "";
+    private string downloadStatus = "";
+    private int downloadPercentage = 0;
+    private string downloadMessage = "";
+    private bool downloadSuccess = false;
+    private bool showDebugInfo = false;
+    private int rawHtmlLength = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReleaseInfo();
+    }
+
+    private async Task LoadReleaseInfo()
+    {
+        isLoading = true;
+        errorMessage = null;
+        StateHasChanged();
+
+        try
+        {
+            // Set User-Agent header to avoid GitHub blocking
+            Http.DefaultRequestHeaders.Clear();
+            Http.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+
+            var response = await Http.GetAsync("https://github.com/LoveRetro/NextUI/releases/latest");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                rawHtmlLength = content.Length; // Store for debugging
+                latestRelease = ParseReleaseFromHtml(content);
+
+                if (latestRelease == null)
+                {
+                    errorMessage = "Failed to parse release information from the page";
+                }
+                else if (!string.IsNullOrEmpty(latestRelease.TagName))
+                {
+                    response = await Http.GetAsync($"https://github.com/LoveRetro/NextUI/releases/expanded_assets/{latestRelease.TagName}");
+                    content = await response.Content.ReadAsStringAsync();
+
+                    var releaseAssetName = $"NextUI-{latestRelease.PublishedDateTime.ToString("yyyymmdd")}-0-all.zip";
+                    var sha256Matches = Regex.Matches(content, @"sha256:([a-fA-F0-9]{64})", RegexOptions.IgnoreCase | RegexOptions.Multiline);
+                    latestRelease.Assets.Add(new GitHubAsset { Url = $"https://github.com/LoveRetro/NextUI/releases/download/{latestRelease.TagName}/{releaseAssetName}", Name = releaseAssetName, Sha256 = sha256Matches[0].Value.Replace("sha256:", "") });
+                }
+
+
+            }
+            else
+            {
+                errorMessage = $"Failed to fetch release page. Status: {response.StatusCode}";
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = $"Network error: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Unexpected error: {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private GitHubRelease? ParseReleaseFromHtml(string html)
+    {
+        try
+        {
+            var release = new GitHubRelease();
+
+            // Extract release title/name
+            var titleMatch = Regex.Match(html, @"<h1[^>]*class=""[^""]*d-inline[^""]*""[^>]*>([^<]+)</h1>", RegexOptions.IgnoreCase);
+            if (titleMatch.Success)
+            {
+                release.Name = titleMatch.Groups[1].Value.Trim();
+            }
+
+            // Extract tag name
+            var tagMatch = Regex.Match(html, @"<span[^>]*class=""[^""]*ml-1[^""]*""[^>]*>([^<]+)</span>", RegexOptions.IgnoreCase);
+            if (!tagMatch.Success)
+            {
+                tagMatch = Regex.Match(html, @"releases/tag/([^""]+)""", RegexOptions.IgnoreCase);
+            }
+            if (tagMatch.Success)
+            {
+                release.TagName = tagMatch.Groups[1].Value.Trim();
+            }
+
+            // Check for pre-release
+            release.IsPrerelease = html.Contains("Pre-release", StringComparison.OrdinalIgnoreCase);
+
+            // Extract author
+            var authorMatch = Regex.Match(html, @"<a[^>]*href=""/([^/""]+)""[^>]*>.*?</a>", RegexOptions.IgnoreCase);
+            if (authorMatch.Success)
+            {
+                release.Author = authorMatch.Groups[1].Value.Trim();
+            }
+
+            // Extract published date
+            var dateMatch = Regex.Match(html, @"<relative-time[^>]*datetime=""([^""]+)""", RegexOptions.IgnoreCase);
+            if (dateMatch.Success && DateTime.TryParse(dateMatch.Groups[1].Value, out var publishedDate))
+            {
+                release.PublishedDate = publishedDate.ToString("MMM dd, yyyy");
+                release.PublishedDateTime = publishedDate;
+            }
+
+            // Extract release notes/body
+            var bodyMatch = Regex.Match(html, @"<div[^>]*class=""[^""]*markdown-body[^""]*""[^>]*>(.*?)</div>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            if (bodyMatch.Success)
+            {
+                var bodyHtml = bodyMatch.Groups[1].Value;
+                release.Body = CleanHtmlContent(bodyHtml);
+            }
+            
+            // Set the release URL
+            release.Url = "https://github.com/LoveRetro/NextUI/releases/latest";
+            
+            // Only return if we got at least some basic info
+            if (!string.IsNullOrEmpty(release.TagName) || !string.IsNullOrEmpty(release.Name))
+            {
+                return release;
+            }
+            
+            return null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+    
+    private string CleanHtmlContent(string html)
+    {
+        if (string.IsNullOrEmpty(html))
+            return string.Empty;
+        
+        // Remove script and style elements
+        html = Regex.Replace(html, @"<(script|style)[^>]*>.*?</\1>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        
+        // Convert common HTML elements to simpler formatting
+        html = Regex.Replace(html, @"<h[1-6][^>]*>(.*?)</h[1-6]>", "<strong>$1</strong><br>", RegexOptions.IgnoreCase);
+        html = Regex.Replace(html, @"<p[^>]*>", "", RegexOptions.IgnoreCase);
+        html = Regex.Replace(html, @"</p>", "<br>", RegexOptions.IgnoreCase);
+        html = Regex.Replace(html, @"<br\s*/?>", "<br>", RegexOptions.IgnoreCase);
+        html = Regex.Replace(html, @"<li[^>]*>(.*?)</li>", "• $1<br>", RegexOptions.IgnoreCase);
+        html = Regex.Replace(html, @"</?ul[^>]*>", "", RegexOptions.IgnoreCase);
+        html = Regex.Replace(html, @"</?ol[^>]*>", "", RegexOptions.IgnoreCase);
+        
+        // Keep links, strong, em, and code elements
+        html = Regex.Replace(html, @"<a[^>]*href=""([^""]+)""[^>]*>(.*?)</a>", "<a href='$1' target='_blank'>$2</a>", RegexOptions.IgnoreCase);
+        
+        // Remove any remaining HTML tags except the ones we want to keep
+        html = Regex.Replace(html, @"<(?!/?(?:strong|em|code|a|br)\b)[^>]+>", "", RegexOptions.IgnoreCase);
+        
+        // Clean up multiple consecutive br tags
+        html = Regex.Replace(html, @"(<br>\s*){3,}", "<br><br>", RegexOptions.IgnoreCase);
+        
+        return html.Trim();
+    }
+    
+    private GitHubAsset? GetAllZipAsset()
+    {
+        return latestRelease?.Assets?.FirstOrDefault(a => 
+            a.Name.Contains("-all.zip", StringComparison.OrdinalIgnoreCase) ||
+            a.Name.Contains("all.zip", StringComparison.OrdinalIgnoreCase) ||
+            a.Name.EndsWith("-all.zip", StringComparison.OrdinalIgnoreCase) ||
+            a.Name.EndsWith("_all.zip", StringComparison.OrdinalIgnoreCase));
+    }
+    
+    private void ShowDebugInfo()
+    {
+        showDebugInfo = !showDebugInfo;
+        StateHasChanged();
+    }
+    
+    private async Task DownloadAndExtractRelease()
+    {
+        var allZipAsset = GetAllZipAsset();
+        if (allZipAsset == null)
+        {
+            downloadMessage = "No *-all.zip file found in the latest release";
+            downloadSuccess = false;
+            StateHasChanged();
+            return;
+        }
+    
+        try
+        {
+            // Reset download state
+            isDownloading = true;
+            downloadMessage = "";
+            downloadPercentage = 0;
+            downloadProgress = "Preparing...";
+            downloadStatus = "Selecting download directory...";
+            StateHasChanged();
+        
+            // Pick folder for extraction
+            var folderResult = await FolderPicker.Default.PickAsync(CancellationToken.None);
+            if (folderResult == null || !folderResult.IsSuccessful)
+            {
+                isDownloading = false;
+                downloadMessage = "Download cancelled - no directory selected";
+                downloadSuccess = false;
+                StateHasChanged();
+                return;
+            }
+        
+            var extractPath = folderResult.Folder.Path;
+        
+            // Validate that the directory is empty
+            downloadStatus = "Validating directory...";
+            downloadPercentage = 5;
+            StateHasChanged();
+        
+            if (!IsDirectoryEmpty(extractPath))
+            {
+                isDownloading = false;
+                downloadMessage = $"The selected directory is not empty. Please select an empty directory for extraction.\n\nSelected path: {extractPath}";
+                downloadSuccess = false;
+                StateHasChanged();
+                return;
+            }
+        
+            downloadStatus = $"Downloading to: {Path.GetFileName(extractPath)}";
+            downloadPercentage = 10;
+            StateHasChanged();
+        
+            // Create temporary file for download
+            var tempFilePath = Path.Combine(FileSystem.Current.CacheDirectory, allZipAsset.Name);
+        
+            // Download the zip file
+            downloadProgress = "Downloading...";
+            downloadStatus = $"Downloading {allZipAsset.Name}";
+            StateHasChanged();
+        
+            using var response = await Http.GetAsync(allZipAsset.Url, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+        
+            var totalBytes = response.Content.Headers.ContentLength ?? 0;
+            var downloadedBytes = 0L;
+        
+            using (var contentStream = await response.Content.ReadAsStreamAsync())
+            using (var fileStream = File.Create(tempFilePath))
+            {
+                var buffer = new byte[8192];
+                var isMoreToRead = true;
+            
+                do
+                {
+                    var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
+                    if (read == 0)
+                    {
+                        isMoreToRead = false;
+                    }
+                    else
+                    {
+                        await fileStream.WriteAsync(buffer, 0, read);
+                        downloadedBytes += read;
+                    
+                        if (totalBytes > 0)
+                        {
+                            downloadPercentage = (int)((downloadedBytes * 50) / totalBytes) + 10; // 10-60% for download
+                            downloadStatus = $"Downloaded {FormatBytes(downloadedBytes)} of {FormatBytes(totalBytes)}";
+                            StateHasChanged();
+                        }
+                    }
+                }
+                while (isMoreToRead);
+            } // File streams are properly disposed here
+        
+            await Task.Delay(500);
+
+            // Verify SHA256 - required for security
+            if (string.IsNullOrEmpty(allZipAsset.Sha256))
+            {
+                File.Delete(tempFilePath);
+                isDownloading = false;
+                downloadMessage = "File verification failed: No SHA256 hash found for the downloaded file. Extraction aborted for security reasons.";
+                downloadSuccess = false;
+                StateHasChanged();
+                return;
+            }
+        
+            downloadProgress = "Verifying...";
+            downloadStatus = "Verifying file integrity (SHA256)...";
+            downloadPercentage = 60;
+            StateHasChanged();
+            await Task.Delay(500);
+        
+            var computedHash = await ComputeSha256Async(tempFilePath);
+            if (!computedHash.Equals(allZipAsset.Sha256, StringComparison.OrdinalIgnoreCase))
+            {
+                File.Delete(tempFilePath);
+                isDownloading = false;
+                downloadMessage = $"File verification failed! Expected SHA256: {allZipAsset.Sha256}, Got: {computedHash}";
+                downloadSuccess = false;
+                StateHasChanged();
+                return;
+            }
+        
+            downloadStatus = "File integrity verified successfully";
+            downloadPercentage = 65;
+            StateHasChanged();
+            await Task.Delay(500);
+        
+            // Extract the zip file
+            downloadProgress = "Extracting...";
+            downloadStatus = "Extracting files...";
+            downloadPercentage = 70;
+            StateHasChanged();
+        
+            // Extract zip file directly to the specified directory
+            using (var archive = ZipFile.OpenRead(tempFilePath))
+            {
+                var totalEntries = archive.Entries.Count;
+                var extractedEntries = 0;
+            
+                foreach (var entry in archive.Entries)
+                {
+                    if (!string.IsNullOrEmpty(entry.Name))
+                    {
+                        var destinationPath = Path.Combine(extractPath, entry.FullName);
+                        var destinationDirectory = Path.GetDirectoryName(destinationPath);
+                    
+                        if (!string.IsNullOrEmpty(destinationDirectory))
+                        {
+                            Directory.CreateDirectory(destinationDirectory);
+                        }
+                    
+                        entry.ExtractToFile(destinationPath, true);
+                    }
+                
+                    extractedEntries++;
+                    downloadPercentage = 70 + (int)((extractedEntries * 25) / totalEntries); // 70-95% for extraction
+                    downloadStatus = $"Extracted {extractedEntries} of {totalEntries} files";
+                    StateHasChanged();
+                }
+            }
+        
+            // Cleanup temp file
+            File.Delete(tempFilePath);
+        
+            // Success
+            downloadPercentage = 100;
+            downloadProgress = "Complete!";
+            downloadStatus = "Download and extraction completed successfully";
+            downloadMessage = $"NextUI {latestRelease.TagName} has been successfully downloaded and extracted to: {extractPath}";
+            downloadSuccess = true;
+
+            StateHasChanged();
+
+            // Show success message briefly, then navigate to BIOS config
+            await Task.Delay(2000);
+            isDownloading = false;
+
+            // Navigate to BIOS configuration page with the extracted path as route parameter
+            Navigation.NavigateTo($"/bios-config/{Uri.EscapeDataString(extractPath)}");
+        }
+        catch (Exception ex)
+        {
+            isDownloading = false;
+            downloadMessage = $"Download failed: {ex.Message}";
+            downloadSuccess = false;
+            StateHasChanged();
+        
+            // Try to cleanup temp file if it exists
+            try
+            {
+                var tempFilePath = Path.Combine(FileSystem.Current.CacheDirectory, allZipAsset.Name);
+                if (File.Exists(tempFilePath))
+                {
+                    File.Delete(tempFilePath);
+                }
+            }
+            catch { /* Ignore cleanup errors */ }
+        }
+    }
+    
+    private string FormatBytes(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+    
+    private async Task<string> ComputeSha256Async(string filePath)
+    {
+        using var sha256 = SHA256.Create();
+        using var fileStream = File.OpenRead(filePath);
+        
+        var buffer = new byte[8192];
+        int bytesRead;
+        
+        while ((bytesRead = await fileStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+        {
+            sha256.TransformBlock(buffer, 0, bytesRead, null, 0);
+        }
+        
+        sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
+        var hash = sha256.Hash ?? Array.Empty<byte>();
+        
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+    
+    private bool IsDirectoryEmpty(string directoryPath)
+    {
+        try
+        {
+            if (!Directory.Exists(directoryPath))
+            {
+                return true; // Directory doesn't exist, so it's "empty"
+            }
+            
+            // Check for any files
+            var files = Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
+            if (files.Length > 0)
+            {
+                return false;
+            }
+            
+            // Check for any subdirectories (excluding system directories like .DS_Store parent folders)
+            var directories = Directory.GetDirectories(directoryPath, "*", SearchOption.AllDirectories);
+            if (directories.Length > 0)
+            {
+                return false;
+            }
+            
+            // Check for any entries in the root directory (including hidden files)
+            var entries = Directory.GetFileSystemEntries(directoryPath);
+            
+            // Filter out common hidden system files that we might want to ignore
+            var filteredEntries = entries.Where(entry =>
+            {
+                var fileName = Path.GetFileName(entry);
+                return !IsSystemFile(fileName);
+            }).ToArray();
+            
+            return filteredEntries.Length == 0;
+        }
+        catch (Exception)
+        {
+            // If we can't read the directory, assume it's not empty for safety
+            return false;
+        }
+    }
+    
+    private bool IsSystemFile(string fileName)
+    {
+        if (string.IsNullOrEmpty(fileName))
+            return false;
+            
+        // Common system files to ignore
+        var systemFiles = new[]
+        {
+            ".DS_Store",      // macOS
+            "Thumbs.db",      // Windows
+            "desktop.ini",    // Windows
+            "._.DS_Store",    // macOS resource fork
+            "__MACOSX"        // macOS archive metadata
+        };
+        
+        return systemFiles.Any(sf => fileName.Equals(sf, StringComparison.OrdinalIgnoreCase));
+    }
+    
+    private string FormatReleaseNotes(string body)
+    {
+        if (string.IsNullOrEmpty(body))
+            return string.Empty;
+        
+        return body;
+    }
+    
+    public class GitHubRelease
+    {
+        public string Name { get; set; } = string.Empty;
+        public string TagName { get; set; } = string.Empty;
+        public string Body { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
+        public string PublishedDate { get; set; } = string.Empty;
+        public DateTime PublishedDateTime { get; set; }
+        public bool IsPrerelease { get; set; }
+        public string Author { get; set; } = string.Empty;
+        public List<GitHubAsset> Assets { get; set; } = new();
+    }
+    
+    public class GitHubAsset
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
+        public string Sha256 { get; set; } = string.Empty;
+    }
+}
