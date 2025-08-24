@@ -27,45 +27,57 @@
                 </div>
 
                 <div class="bios-files">
-                    @foreach (var biosFile in system.BiosFiles)
+                    @foreach (var biosGroup in system.BiosFiles.GroupBy(b => b.FileName))
                     {
-                        <div class="bios-file-row">
-                            <div class="file-info">
-                                <span class="file-name">@biosFile.FileName</span>
-                                <span class="file-path">@biosFile.ExpectedPath</span>
-                            </div>
-
-                            <div class="file-actions">
-                                @if (!string.IsNullOrEmpty(biosFile.SelectedPath))
-                                {
-                                    <div class="file-status">
-                                        <span class="status-icon selected">✓</span>
-                                        <span class="selected-path" title="@biosFile.SelectedPath">
-                                            @Path.GetFileName(biosFile.SelectedPath)
-                                        </span>
-                                        <button class="btn btn-sm btn-secondary" @onclick="() => ClearSelection(biosFile)">
-                                            Clear
-                                        </button>
+                        <div class="bios-file-group">
+                            <div class="bios-file-row">
+                                <div class="file-info">
+                                    <span class="file-name">@biosGroup.Key</span>
+                                    <div class="file-paths">
+                                        @foreach (var biosFile in biosGroup)
+                                        {
+                                            <span class="file-path">@biosFile.ExpectedPath</span>
+                                        }
                                     </div>
-                                }
-                                else
-                                {
-                                    <div class="file-status">
-                                        <span class="status-icon missing">○</span>
-                                        <span class="missing-text">Not selected</span>
-                                    </div>
-                                }
+                                </div>
 
-                                <button class="btn btn-primary" @onclick="() => SelectBiosFile(biosFile)" disabled="@isSelectingFile">
-                                    @if (isSelectingFile && currentSelectingFile == biosFile.Id)
+                                <div class="file-actions">
+                                    @{
+                                        var representativeBios = biosGroup.First();
+                                        var isSelected = !string.IsNullOrEmpty(representativeBios.SelectedPath);
+                                    }
+
+                                    @if (isSelected)
                                     {
-                                        <span>Selecting...</span>
+                                        <div class="file-status">
+                                            <span class="status-icon selected">✓</span>
+                                            <span class="selected-path" title="@representativeBios.SelectedPath">
+                                                @Path.GetFileName(representativeBios.SelectedPath)
+                                            </span>
+                                            <button class="btn btn-sm btn-secondary" @onclick="() => ClearGroupSelection(biosGroup)">
+                                                Clear
+                                            </button>
+                                        </div>
                                     }
                                     else
                                     {
-                                        <span>Select File</span>
+                                        <div class="file-status">
+                                            <span class="status-icon missing">○</span>
+                                            <span class="missing-text">Not selected</span>
+                                        </div>
                                     }
-                                </button>
+
+                                    <button class="btn btn-primary" @onclick="() => SelectBiosFile(biosGroup)" disabled="@isSelectingFile">
+                                        @if (isSelectingFile && currentSelectingFile == representativeBios.FileName)
+                                        {
+                                            <span>Selecting...</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Select File</span>
+                                        }
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     }
@@ -183,6 +195,10 @@
         padding: 16px;
     }
 
+    .bios-file-group {
+        margin-bottom: 8px;
+    }
+
     .bios-file-row {
         display: flex;
         justify-content: space-between;
@@ -191,7 +207,6 @@
         background: white;
         border: 1px solid #e1e4e8;
         border-radius: 6px;
-        margin-bottom: 8px;
     }
 
     .file-info {
@@ -205,6 +220,12 @@
         font-weight: 600;
         color: #24292e;
         font-family: 'SFMono-Regular', Consolas, monospace;
+    }
+
+    .file-paths {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
     }
 
     .file-path {
@@ -244,7 +265,7 @@
 
         .status-icon.missing {
             background: #e1e4e8;
-            color: #586069;
+            color: #d73a49;
             border: 2px solid #d0d7de;
         }
 
@@ -411,7 +432,7 @@
         font-size: 0.9em;
     }
 
-    media (max-width: 768px) {
+    .media (max-width: 768px) {
         .bios-file-row
 
     {
@@ -448,8 +469,8 @@
     private string statusMessage = "";
     private bool isSuccess = false;
 
-    private int selectedFilesCount => biosSystems.SelectMany(s => s.BiosFiles).Count(f => !string.IsNullOrEmpty(f.SelectedPath));
-    private int totalFilesCount => biosSystems.SelectMany(s => s.BiosFiles).Count();
+    private int selectedFilesCount => GetUniqueSelectedFiles().Count();
+    private int totalFilesCount => GetUniqueFileNames().Count();
 
     private List<BiosSystem> biosSystems = new();
 
@@ -493,7 +514,8 @@
                     {
                         Id = "fc_disksys",
                         FileName = "disksys.rom",
-                        ExpectedPath = $"{extractedPath}/Bios/FC/disksys.rom"
+                        ExpectedPath = $"{extractedPath}/Bios/FC/disksys.rom",
+                        Sha1 = "57fe1bdee955bb48d357e463ccbf129496930b62",
                     }
                 }
             },
@@ -507,7 +529,8 @@
                     {
                         Id = "gb_bios",
                         FileName = "gb_bios.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/GB/gb_bios.bin"
+                        ExpectedPath = $"{extractedPath}/Bios/GB/gb_bios.bin",
+                        Sha1 = "4ed31ec6b0b175bb109c0eb5fd3d193da823339f",
                     }
                 }
             },
@@ -521,7 +544,8 @@
                     {
                         Id = "gbc_bios",
                         FileName = "gbc_bios.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/GBC/gbc_bios.bin"
+                        ExpectedPath = $"{extractedPath}/Bios/GBC/gbc_bios.bin",
+                        Sha1 = "1293d68bf9643bc4f36954c1e80e38f39864528d",
                     }
                 }
             },
@@ -533,15 +557,17 @@
                 {
                     new BiosFile
                     {
-                        Id = "gba_bios",
+                        Id = "gba_bios_gba",
                         FileName = "gba_bios.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/GBA/gba_bios.bin"
+                        ExpectedPath = $"{extractedPath}/Bios/GBA/gba_bios.bin",
+                        Sha1 = "300c20df6731a33952ded8c436f7f186d25d3492",
                     },
                     new BiosFile
                     {
-                        Id = "gba_bios",
+                        Id = "gba_bios_mgba",
                         FileName = "gba_bios.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/MGBA/gba_bios.bin"
+                        ExpectedPath = $"{extractedPath}/Bios/MGBA/gba_bios.bin",
+                        Sha1 = "300c20df6731a33952ded8c436f7f186d25d3492",
                     }
                 }
             },
@@ -555,37 +581,43 @@
                     {
                         Id = "md_bios_cd_e",
                         FileName = "bios_CD_E.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/MD/bios_CD_E.bin"
+                        ExpectedPath = $"{extractedPath}/Bios/MD/bios_CD_E.bin",
+                        Sha1 = "f891e0ea651e2232af0c5c4cb46a0cae2ee8f356",
                     },
                     new BiosFile
                     {
                         Id = "md_bios_cd_j",
                         FileName = "bios_CD_J.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/MD/bios_CD_J.bin"
+                        ExpectedPath = $"{extractedPath}/Bios/MD/bios_CD_J.bin",
+                        Sha1 = "4846f448160059a7da0215a5df12ca160f26dd69",
                     },
                     new BiosFile
                     {
                         Id = "md_bios_cd_u",
                         FileName = "bios_CD_U.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/MD/bios_CD_U.bin"
+                        ExpectedPath = $"{extractedPath}/Bios/MD/bios_CD_U.bin",
+                        Sha1 = "f4f315adcef9b8feb0364c21ab7f0eaf5457f3ed",
                     },
                     new BiosFile
                     {
                         Id = "segacd_bios_cd_e",
                         FileName = "bios_CD_E.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/SEGACD/bios_CD_E.bin"
+                        ExpectedPath = $"{extractedPath}/Bios/SEGACD/bios_CD_E.bin",
+                        Sha1 = "f891e0ea651e2232af0c5c4cb46a0cae2ee8f356",
                     },
                     new BiosFile
                     {
                         Id = "segacd_bios_cd_j",
                         FileName = "bios_CD_J.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/SEGACD/bios_CD_J.bin"
+                        ExpectedPath = $"{extractedPath}/Bios/SEGACD/bios_CD_J.bin",
+                        Sha1 = "4846f448160059a7da0215a5df12ca160f26dd69",
                     },
                     new BiosFile
                     {
                         Id = "segacd_bios_cd_u",
                         FileName = "bios_CD_U.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/SEGACD/bios_CD_U.bin"
+                        ExpectedPath = $"{extractedPath}/Bios/SEGACD/bios_CD_U.bin",
+                        Sha1 = "f4f315adcef9b8feb0364c21ab7f0eaf5457f3ed",
                     }
                 }
             },
@@ -599,7 +631,8 @@
                     {
                         Id = "pce_syscard3",
                         FileName = "syscard3.pce",
-                        ExpectedPath = $"{extractedPath}/Bios/PCE/syscard3.pce"
+                        ExpectedPath = $"{extractedPath}/Bios/PCE/syscard3.pce",
+                        Sha1 = "79f5ff55dd10187c7fd7b8daab0b3ffbd1f56a2c",
                     }
                 }
             },
@@ -613,45 +646,74 @@
                     {
                         Id = "ps_psxonpsp660",
                         FileName = "psxonpsp660.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/PS/psxonpsp660.bin"
+                        ExpectedPath = $"{extractedPath}/Bios/PS/psxonpsp660.bin",
+                        Sha1 = "96880d1ca92a016ff054be5159bb06fe03cb4e14",
                     }
                 }
             }
         };
     }
 
-    private async Task SelectBiosFile(BiosFile biosFile)
+    private IEnumerable<string> GetUniqueFileNames()
+    {
+        return biosSystems
+            .SelectMany(s => s.BiosFiles)
+            .Select(f => f.FileName)
+            .Distinct();
+    }
+
+    private IEnumerable<string> GetUniqueSelectedFiles()
+    {
+        return biosSystems
+            .SelectMany(s => s.BiosFiles)
+            .Where(f => !string.IsNullOrEmpty(f.SelectedPath))
+            .Select(f => f.FileName)
+            .Distinct();
+    }
+
+    private async Task SelectBiosFile(IGrouping<string, BiosFile> biosGroup)
     {
         try
         {
             isSelectingFile = true;
-            currentSelectingFile = biosFile.Id;
+            currentSelectingFile = biosGroup.Key;
             StateHasChanged();
-
-            var customFileType = new FilePickerFileType(
-                new Dictionary<DevicePlatform, IEnumerable<string>>
-                {
-                    { DevicePlatform.iOS, new[] { "public.data" } },
-                    { DevicePlatform.Android, new[] { "*/*" } },
-                    { DevicePlatform.WinUI, new[] { "*" } },
-                    { DevicePlatform.Tizen, new[] { "*/*" } },
-                    { DevicePlatform.macOS, new[] { "*" } },
-                    { DevicePlatform.MacCatalyst, new[] { "*" } },
-                });
 
             var options = new PickOptions()
             {
-                PickerTitle = $"Select {biosFile.FileName}",
-                FileTypes = customFileType,
+                PickerTitle = $"Select {biosGroup.Key}",
             };
 
             var fileResult = await FilePicker.Default.PickAsync(options);
 
             if (fileResult != null)
             {
-                biosFile.SelectedPath = fileResult.FullPath;
-                statusMessage = $"Selected: {Path.GetFileName(fileResult.FullPath)} for {biosFile.FileName}";
-                isSuccess = true;
+                if (fileResult.FileName == currentSelectingFile)
+                {
+                    // Update all BIOS files in the group with the same selected path
+                    foreach (var biosFile in biosGroup)
+                    {
+                        biosFile.SelectedPath = fileResult.FullPath;
+                    }
+
+                    // Also update any other BIOS files across all systems that have the same filename
+                    foreach (var system in biosSystems)
+                    {
+                        foreach (var biosFile in system.BiosFiles.Where(f => f.FileName == biosGroup.Key))
+                        {
+                            biosFile.SelectedPath = fileResult.FullPath;
+                        }
+                    }
+
+                    statusMessage = $"Selected: {Path.GetFileName(fileResult.FullPath)} for {biosGroup.Key}";
+                    isSuccess = true;
+                }
+                else
+                {
+                    statusMessage = $"Selected invalid file {Path.GetFileName(fileResult.FullPath)} for {biosGroup.Key}";
+                    isSuccess = false;
+                }
+
             }
         }
         catch (Exception ex)
@@ -667,9 +729,16 @@
         }
     }
 
-    private void ClearSelection(BiosFile biosFile)
+    private void ClearGroupSelection(IGrouping<string, BiosFile> biosGroup)
     {
-        biosFile.SelectedPath = "";
+        // Clear all BIOS files with the same filename across all systems
+        foreach (var system in biosSystems)
+        {
+            foreach (var biosFile in system.BiosFiles.Where(f => f.FileName == biosGroup.Key))
+            {
+                biosFile.SelectedPath = "";
+            }
+        }
         StateHasChanged();
     }
 
@@ -713,7 +782,7 @@
             for (int i = 0; i < selectedFiles.Count; i++)
             {
                 var biosFile = selectedFiles[i];
-                copyStatus = $"Copying {biosFile.FileName} ({i + 1} of {selectedFiles.Count})";
+                copyStatus = $"Copying {biosFile.FileName} to {Path.GetDirectoryName(biosFile.ExpectedPath)} ({i + 1} of {selectedFiles.Count})";
                 copyPercentage = (int)((i * 100) / selectedFiles.Count);
                 StateHasChanged();
 
@@ -734,7 +803,7 @@
             copyPercentage = 100;
             copyProgress = "Complete!";
             copyStatus = "All selected files copied successfully";
-            statusMessage = $"Successfully copied {selectedFiles.Count} BIOS file(s) to their respective directories.";
+            statusMessage = $"Successfully copied {GetUniqueSelectedFiles().Count()} unique BIOS file(s) to {selectedFiles.Count} location(s).";
             isSuccess = true;
             StateHasChanged();
 
@@ -784,5 +853,6 @@
         public string FileName { get; set; } = "";
         public string ExpectedPath { get; set; } = "";
         public string SelectedPath { get; set; } = "";
+        public string Sha1 { get; set; } = "";
     }
 }
