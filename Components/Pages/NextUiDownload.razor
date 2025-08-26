@@ -82,6 +82,7 @@
             <div class="actions">
                 <a href="@latestRelease.Url" target="_blank" class="btn btn-primary">View on GitHub</a>
                 <button class="btn btn-secondary" @onclick="LoadReleaseInfo">Refresh</button>
+                <button class="btn btn-info" @onclick="SkipDownload">Skip Download</button>
                 @{
                     var allZipAsset = GetAllZipAsset();
                 }
@@ -472,7 +473,6 @@
 
         try
         {
-            // Set User-Agent header to avoid GitHub blocking
             Http.DefaultRequestHeaders.Clear();
             Http.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
 
@@ -493,7 +493,8 @@
                     response = await Http.GetAsync($"https://github.com/LoveRetro/NextUI/releases/expanded_assets/{latestRelease.TagName}");
                     content = await response.Content.ReadAsStringAsync();
 
-                    var releaseAssetName = $"NextUI-{latestRelease.PublishedDateTime.ToString("yyyymmdd")}-0-all.zip";
+                    //TODO Use regex to parse the releaseAssetName and the sha256 from the -all.zip section instead of making assumptions about the format and that the first sha256 match is the -all.zip one
+                    var releaseAssetName = $"NextUI-{latestRelease.PublishedDateTime.ToString("yyyyMMdd")}-0-all.zip";
                     var sha256Matches = Regex.Matches(content, @"sha256:([a-fA-F0-9]{64})", RegexOptions.IgnoreCase | RegexOptions.Multiline);
                     latestRelease.Assets.Add(new GitHubAsset { Url = $"https://github.com/LoveRetro/NextUI/releases/download/{latestRelease.TagName}/{releaseAssetName}", Name = releaseAssetName, Sha256 = sha256Matches[0].Value.Replace("sha256:", "") });
                 }
@@ -569,16 +570,16 @@
                 var bodyHtml = bodyMatch.Groups[1].Value;
                 release.Body = CleanHtmlContent(bodyHtml);
             }
-            
+
             // Set the release URL
             release.Url = "https://github.com/LoveRetro/NextUI/releases/latest";
-            
+
             // Only return if we got at least some basic info
             if (!string.IsNullOrEmpty(release.TagName) || !string.IsNullOrEmpty(release.Name))
             {
                 return release;
             }
-            
+
             return null;
         }
         catch (Exception)
@@ -586,15 +587,15 @@
             return null;
         }
     }
-    
+
     private string CleanHtmlContent(string html)
     {
         if (string.IsNullOrEmpty(html))
             return string.Empty;
-        
+
         // Remove script and style elements
         html = Regex.Replace(html, @"<(script|style)[^>]*>.*?</\1>", "", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-        
+
         // Convert common HTML elements to simpler formatting
         html = Regex.Replace(html, @"<h[1-6][^>]*>(.*?)</h[1-6]>", "<strong>$1</strong><br>", RegexOptions.IgnoreCase);
         html = Regex.Replace(html, @"<p[^>]*>", "", RegexOptions.IgnoreCase);
@@ -603,19 +604,19 @@
         html = Regex.Replace(html, @"<li[^>]*>(.*?)</li>", "• $1<br>", RegexOptions.IgnoreCase);
         html = Regex.Replace(html, @"</?ul[^>]*>", "", RegexOptions.IgnoreCase);
         html = Regex.Replace(html, @"</?ol[^>]*>", "", RegexOptions.IgnoreCase);
-        
+
         // Keep links, strong, em, and code elements
         html = Regex.Replace(html, @"<a[^>]*href=""([^""]+)""[^>]*>(.*?)</a>", "<a href='$1' target='_blank'>$2</a>", RegexOptions.IgnoreCase);
-        
+
         // Remove any remaining HTML tags except the ones we want to keep
         html = Regex.Replace(html, @"<(?!/?(?:strong|em|code|a|br)\b)[^>]+>", "", RegexOptions.IgnoreCase);
-        
+
         // Clean up multiple consecutive br tags
         html = Regex.Replace(html, @"(<br>\s*){3,}", "<br><br>", RegexOptions.IgnoreCase);
-        
+
         return html.Trim();
     }
-    
+
     private GitHubAsset? GetAllZipAsset()
     {
         return latestRelease?.Assets?.FirstOrDefault(a => 
@@ -624,13 +625,19 @@
             a.Name.EndsWith("-all.zip", StringComparison.OrdinalIgnoreCase) ||
             a.Name.EndsWith("_all.zip", StringComparison.OrdinalIgnoreCase));
     }
-    
+
+    private void SkipDownload()
+    {
+        //TODO remove
+        Navigation.NavigateTo($"/bios-config/{Uri.EscapeDataString(@"C:\Users\ahoog\Desktop\test_nextui_download")}");
+    }
+
     private void ShowDebugInfo()
     {
         showDebugInfo = !showDebugInfo;
         StateHasChanged();
     }
-    
+
     private async Task DownloadAndExtractRelease()
     {
         var allZipAsset = GetAllZipAsset();
@@ -641,7 +648,7 @@
             StateHasChanged();
             return;
         }
-    
+
         try
         {
             // Reset download state
@@ -651,7 +658,7 @@
             downloadProgress = "Preparing...";
             downloadStatus = "Selecting download directory...";
             StateHasChanged();
-        
+
             // Pick folder for extraction
             var folderResult = await FolderPicker.Default.PickAsync(CancellationToken.None);
             if (folderResult == null || !folderResult.IsSuccessful)
@@ -662,14 +669,14 @@
                 StateHasChanged();
                 return;
             }
-        
+
             var extractPath = folderResult.Folder.Path;
-        
+
             // Validate that the directory is empty
             downloadStatus = "Validating directory...";
             downloadPercentage = 5;
             StateHasChanged();
-        
+
             if (!IsDirectoryEmpty(extractPath))
             {
                 isDownloading = false;
@@ -678,31 +685,31 @@
                 StateHasChanged();
                 return;
             }
-        
+
             downloadStatus = $"Downloading to: {Path.GetFileName(extractPath)}";
             downloadPercentage = 10;
             StateHasChanged();
-        
+
             // Create temporary file for download
             var tempFilePath = Path.Combine(FileSystem.Current.CacheDirectory, allZipAsset.Name);
-        
+
             // Download the zip file
             downloadProgress = "Downloading...";
             downloadStatus = $"Downloading {allZipAsset.Name}";
             StateHasChanged();
-        
+
             using var response = await Http.GetAsync(allZipAsset.Url, HttpCompletionOption.ResponseHeadersRead);
             response.EnsureSuccessStatusCode();
-        
+
             var totalBytes = response.Content.Headers.ContentLength ?? 0;
             var downloadedBytes = 0L;
-        
+
             using (var contentStream = await response.Content.ReadAsStreamAsync())
             using (var fileStream = File.Create(tempFilePath))
             {
                 var buffer = new byte[8192];
                 var isMoreToRead = true;
-            
+
                 do
                 {
                     var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
@@ -714,7 +721,7 @@
                     {
                         await fileStream.WriteAsync(buffer, 0, read);
                         downloadedBytes += read;
-                    
+
                         if (totalBytes > 0)
                         {
                             downloadPercentage = (int)((downloadedBytes * 50) / totalBytes) + 10; // 10-60% for download
@@ -725,7 +732,7 @@
                 }
                 while (isMoreToRead);
             } // File streams are properly disposed here
-        
+
             await Task.Delay(500);
 
             // Verify SHA256 - required for security
@@ -738,13 +745,13 @@
                 StateHasChanged();
                 return;
             }
-        
+
             downloadProgress = "Verifying...";
             downloadStatus = "Verifying file integrity (SHA256)...";
             downloadPercentage = 60;
             StateHasChanged();
             await Task.Delay(500);
-        
+
             var computedHash = await ComputeSha256Async(tempFilePath);
             if (!computedHash.Equals(allZipAsset.Sha256, StringComparison.OrdinalIgnoreCase))
             {
@@ -755,45 +762,21 @@
                 StateHasChanged();
                 return;
             }
-        
+
             downloadStatus = "File integrity verified successfully";
             downloadPercentage = 65;
             StateHasChanged();
             await Task.Delay(500);
-        
+
             // Extract the zip file
             downloadProgress = "Extracting...";
             downloadStatus = "Extracting files...";
             downloadPercentage = 70;
             StateHasChanged();
-        
+            await Task.Delay(500);
+
             // Extract zip file directly to the specified directory
-            using (var archive = ZipFile.OpenRead(tempFilePath))
-            {
-                var totalEntries = archive.Entries.Count;
-                var extractedEntries = 0;
-            
-                foreach (var entry in archive.Entries)
-                {
-                    if (!string.IsNullOrEmpty(entry.Name))
-                    {
-                        var destinationPath = Path.Combine(extractPath, entry.FullName);
-                        var destinationDirectory = Path.GetDirectoryName(destinationPath);
-                    
-                        if (!string.IsNullOrEmpty(destinationDirectory))
-                        {
-                            Directory.CreateDirectory(destinationDirectory);
-                        }
-                    
-                        entry.ExtractToFile(destinationPath, true);
-                    }
-                
-                    extractedEntries++;
-                    downloadPercentage = 70 + (int)((extractedEntries * 25) / totalEntries); // 70-95% for extraction
-                    downloadStatus = $"Extracted {extractedEntries} of {totalEntries} files";
-                    StateHasChanged();
-                }
-            }
+            ZipFile.ExtractToDirectory(tempFilePath, extractPath, true);
         
             // Cleanup temp file
             File.Delete(tempFilePath);

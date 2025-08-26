@@ -3,8 +3,10 @@
 @using System.IO
 @using System.Web
 @using Microsoft.Maui.Storage
+@using System.Net.Http
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
+@inject HttpClient Http
 
 <div class="bios-container">
     <h3>BIOS Configuration</h3>
@@ -32,7 +34,10 @@
                         <div class="bios-file-group">
                             <div class="bios-file-row">
                                 <div class="file-info">
-                                    <span class="file-name">@biosGroup.Key</span>
+                                    <div class="file-name-hash-row">
+                                        <span class="file-name">@biosGroup.Key</span>
+                                        <span class="file-hash">(sha1:@biosGroup.First().Sha1)</span>
+                                    </div>
                                     <div class="file-paths">
                                         @foreach (var biosFile in biosGroup)
                                         {
@@ -216,10 +221,27 @@
         gap: 4px;
     }
 
+    .file-name-hash-row {
+        flex: 1;
+        display: flex;
+        flex-direction: row;
+        gap: 4px;
+    }
+
     .file-name {
+        display: inline-flex;
         font-weight: 600;
         color: #24292e;
         font-family: 'SFMono-Regular', Consolas, monospace;
+    }
+
+    .file-hash {
+        display: inline-flex;
+        font-weight: 100;
+        color: #24292e;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 80%;
+        align-self: safe center;
     }
 
     .file-paths {
@@ -650,6 +672,21 @@
                         Sha1 = "96880d1ca92a016ff054be5159bb06fe03cb4e14",
                     }
                 }
+            },
+            new BiosSystem
+            {
+                SystemName = "Arcade",
+                SystemCode = "FBN",
+                BiosFiles = new List<BiosFile>
+                {
+                    new BiosFile
+                    {
+                        Id = "neogeo",
+                        FileName = "neogeo.zip",
+                        ExpectedPath = $"{extractedPath}/Roms/Arcade (FBN)/neogeo.zip",
+                        Sha1 = "deb62b0074b8cae4f162c257662136733cfc76ad",
+                    }
+                }
             }
         };
     }
@@ -795,6 +832,42 @@
 
                 // Copy the file
                 File.Copy(biosFile.SelectedPath, biosFile.ExpectedPath, true);
+
+                if (biosFile.Id == "neogeo")
+                {
+                    var mapTxtPath = biosFile.ExpectedPath.Replace(biosFile.FileName, "");
+                    using (StreamWriter sw = File.CreateText(Path.Combine(mapTxtPath, "map.txt")))
+                    {
+                        // Download full arcade map.txt
+                        copyStatus = $"Downloading map.txt file for Arcade rom name mapping";
+                        StateHasChanged();
+
+                        Http.DefaultRequestHeaders.Clear();
+                        Http.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+                        var response = await Http.GetAsync("https://raw.githubusercontent.com/ryanmsartor/TrimUI-Brick-and-Smart-Pro-Custom-MinUI-Paks/refs/heads/main/Roms/Arcade%20(FBN)/map.txt");
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            copyStatus = $"map.txt file downloaded";
+                            StateHasChanged();
+
+                            var mapContent = await response.Content.ReadAsStringAsync();
+                            // Hide the Neo Geo Bios from the rom list
+                            mapContent = mapContent.Replace("neogeo.zip	Neo Geo Bios", "neogeo.zip	.Neo Geo Bios");
+                            sw.Write(mapContent);
+                        }
+                        else
+                        {
+                            copyStatus = $"Full map.txt download failed, manually adding a map.txt for the neogeo bios so that it's hidden in the rom list";
+                            StateHasChanged();
+
+                            sw.WriteLine("neogeo.zip	.Neo Geo Bios");
+                        }
+
+                        copyStatus = $"map.txt added at {mapTxtPath}";
+                        StateHasChanged();
+                    }
+                }
 
                 // Small delay for UI feedback
                 await Task.Delay(200);
