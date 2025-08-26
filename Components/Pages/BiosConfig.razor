@@ -901,8 +901,7 @@
         StateHasChanged();
 
         // In a real app, you'd navigate to the next page or complete the setup
-        await Task.Delay(2000);
-        // Navigation.NavigateTo("/setup-complete"); // Example navigation
+        Navigation.NavigateTo($"/rom-config/{Uri.EscapeDataString(extractedPath)}"); // Example navigation
     }
 
     // Method to set the extracted path (call this when navigating from the release page)

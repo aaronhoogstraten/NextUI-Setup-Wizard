@@ -1,0 +1,850 @@
+﻿@page "/rom-config"
+@page "/rom-config/{ExtractedPath}"
+@using System.IO
+@using System.Web
+@using Microsoft.Maui.Storage
+@using System.Net.Http
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@inject HttpClient Http
+
+<div class="rom-container">
+    <h3>ROM Configuration</h3>
+    <p class="intro-text">Please select ROM files for each gaming system. You can select multiple files at once for each system.</p>
+
+    @if (!string.IsNullOrEmpty(extractedPath))
+    {
+        <div class="path-info">
+            <p><strong>NextUI Installation Path:</strong> @extractedPath</p>
+        </div>
+    }
+
+    <div class="systems-list">
+        @foreach (var system in romSystems)
+        {
+            <div class="system-card">
+                <div class="system-header">
+                    <h4>@system.SystemName</h4>
+                    <span class="system-code">(@system.SystemCode)</span>
+                </div>
+
+                <div class="rom-files">
+                    <div class="system-info">
+                        <div class="file-info">
+                            <div class="destination-path">
+                                <span class="path-label">Destination:</span>
+                                <span class="file-path">@system.RomPath</span>
+                            </div>
+                            <div class="supported-formats">
+                                <span class="formats-label">Supported formats:</span>
+                                <span class="formats-text">@string.Join(", ", system.SupportedFormats)</span>
+                            </div>
+                        </div>
+
+                        <div class="file-actions">
+                            <div class="file-status">
+                                @if (system.SelectedFiles.Count > 0)
+                                {
+                                    <span class="status-icon selected">✓</span>
+                                    <span class="selected-count">@system.SelectedFiles.Count file(s) selected</span>
+                                    <button class="btn btn-sm btn-secondary" @onclick="() => ClearSystemSelection(system)">
+                                        Clear
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="status-icon missing">○</span>
+                                    <span class="missing-text">No files selected</span>
+                                }
+                            </div>
+
+                            <button class="btn btn-primary" @onclick="() => SelectRomFiles(system)" disabled="@isSelectingFiles">
+                                @if (isSelectingFiles && currentSelectingSystem == system.SystemCode)
+                                {
+                                    <span>Selecting...</span>
+                                }
+                                else
+                                {
+                                    <span>Select ROM Files</span>
+                                }
+                            </button>
+                        </div>
+                    </div>
+
+                    @if (system.SelectedFiles.Count > 0)
+                    {
+                        <div class="selected-files-list">
+                            <h5>Selected Files:</h5>
+                            <div class="files-grid">
+                                @foreach (var file in system.SelectedFiles)
+                                {
+                                    <div class="file-item">
+                                        <span class="file-icon">📄</span>
+                                        <span class="file-name" title="@file.FullPath">@file.FileName</span>
+                                        <button class="btn btn-xs btn-danger" @onclick="() => RemoveFile(system, file)">×</button>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="summary-section">
+        <div class="summary-stats">
+            <p>
+                <strong>Total Files Selected:</strong> @totalSelectedFiles
+                (@systemsWithFiles systems have files)
+            </p>
+            <div class="systems-breakdown">
+                @foreach (var system in romSystems.Where(s => s.SelectedFiles.Count > 0))
+                {
+                    <span class="system-count">@system.SystemCode: @system.SelectedFiles.Count files</span>
+                }
+            </div>
+        </div>
+
+        <div class="action-buttons">
+            <button class="btn btn-secondary" @onclick="ClearAllSelections">Clear All</button>
+            <button class="btn btn-success" @onclick="CopyRomsToDirectories" disabled="@(totalSelectedFiles == 0 || isCopying)">
+                @if (isCopying)
+                {
+                    <span>@copyProgress</span>
+                }
+                else
+                {
+                    <span>Copy ROMs (@totalSelectedFiles files)</span>
+                }
+            </button>
+            <button class="btn btn-info" @onclick="SkipRomSetup">Skip ROM Setup</button>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="status-message @(isSuccess ? "success" : "error")">
+            @statusMessage
+        </div>
+    }
+
+    @if (isCopying)
+    {
+        <div class="copy-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: @(copyPercentage)%"></div>
+            </div>
+            <p class="progress-text">@copyStatus</p>
+        </div>
+    }
+</div>
+
+<style>
+    .rom-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .intro-text {
+        color: #586069;
+        margin-bottom: 20px;
+        font-size: 1.1em;
+    }
+
+    .path-info {
+        background: #f1f8ff;
+        border: 1px solid #c8e1ff;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 20px;
+    }
+
+        .path-info p {
+            margin: 0;
+            color: #0366d6;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.9em;
+        }
+
+    .systems-list {
+        margin-bottom: 30px;
+    }
+
+    .system-card {
+        background: #f6f8fa;
+        border: 1px solid #d0d7de;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        overflow: hidden;
+    }
+
+    .system-header {
+        background: #24292e;
+        color: white;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+        .system-header h4 {
+            margin: 0;
+            font-size: 1.2em;
+        }
+
+    .system-code {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+    }
+
+    .rom-files {
+        padding: 16px;
+    }
+
+    .system-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        background: white;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        margin-bottom: 12px;
+    }
+
+    .file-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .destination-path, .supported-formats {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .path-label, .formats-label {
+        font-weight: 600;
+        color: #24292e;
+        font-size: 0.9em;
+        min-width: 80px;
+    }
+
+    .file-path {
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        color: #586069;
+        font-size: 0.85em;
+    }
+
+    .formats-text {
+        color: #586069;
+        font-size: 0.85em;
+        font-style: italic;
+    }
+
+    .file-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .file-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 180px;
+    }
+
+    .status-icon {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+    }
+
+        .status-icon.selected {
+            background: #28a745;
+            color: white;
+        }
+
+        .status-icon.missing {
+            background: #e1e4e8;
+            color: #d73a49;
+            border: 2px solid #d0d7de;
+        }
+
+    .selected-count {
+        color: #28a745;
+        font-size: 0.9em;
+        font-weight: 500;
+    }
+
+    .missing-text {
+        color: #d73a49;
+        font-size: 0.9em;
+    }
+
+    .selected-files-list {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 12px;
+    }
+
+        .selected-files-list h5 {
+            margin: 0 0 10px 0;
+            color: #495057;
+            font-size: 0.95em;
+        }
+
+    .files-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 8px;
+    }
+
+    .file-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 6px 10px;
+        font-size: 0.85em;
+    }
+
+    .file-icon {
+        font-size: 14px;
+    }
+
+    .file-name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #495057;
+    }
+
+    .btn {
+        padding: 8px 12px;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #f6f8fa;
+        color: #24292e;
+        text-decoration: none;
+        cursor: pointer;
+        font-size: 13px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+        .btn:hover {
+            background: #f3f4f6;
+            border-color: #d0d7de;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+    .btn-primary {
+        background: #2da44e;
+        color: white;
+        border-color: #2da44e;
+    }
+
+        .btn-primary:hover {
+            background: #2c974b;
+            border-color: #2c974b;
+        }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border-color: #6c757d;
+    }
+
+        .btn-secondary:hover {
+            background: #5c636a;
+            border-color: #5c636a;
+        }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+        border-color: #28a745;
+    }
+
+        .btn-success:hover {
+            background: #218838;
+            border-color: #1e7e34;
+        }
+
+    .btn-info {
+        background: #17a2b8;
+        color: white;
+        border-color: #17a2b8;
+    }
+
+        .btn-info:hover {
+            background: #138496;
+            border-color: #117a8b;
+        }
+
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+        border-color: #dc3545;
+    }
+
+        .btn-danger:hover {
+            background: #c82333;
+            border-color: #bd2130;
+        }
+
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 12px;
+    }
+
+    .btn-xs {
+        padding: 2px 6px;
+        font-size: 11px;
+        min-width: 20px;
+        justify-content: center;
+    }
+
+    .summary-section {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+
+    .summary-stats {
+        margin-bottom: 15px;
+    }
+
+        .summary-stats p {
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
+            color: #495057;
+        }
+
+    .systems-breakdown {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .system-count {
+        background: #e9ecef;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.85em;
+        color: #495057;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .status-message {
+        margin-top: 20px;
+        padding: 12px;
+        border-radius: 6px;
+        font-weight: 500;
+    }
+
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+    .copy-progress {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+    }
+
+    .progress-bar {
+        width: 100%;
+        height: 20px;
+        background: #e9ecef;
+        border-radius: 10px;
+        overflow: hidden;
+        margin-bottom: 10px;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #28a745, #20c997);
+        transition: width 0.3s ease;
+        border-radius: 10px;
+    }
+
+    .progress-text {
+        margin: 0;
+        text-align: center;
+        color: #495057;
+        font-size: 0.9em;
+    }
+
+    .media (max-width: 768px) {
+        .system-info
+
+    {
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+    }
+
+    .file-actions {
+        justify-content: space-between;
+    }
+
+    .action-buttons {
+        flex-direction: column;
+    }
+
+    .btn {
+        justify-content: center;
+    }
+
+    .files-grid {
+        grid-template-columns: 1fr;
+    }
+
+    }
+</style>
+
+@code {
+    [Parameter] public string? ExtractedPath { get; set; }
+
+    private string extractedPath = "";
+    private bool isSelectingFiles = false;
+    private string currentSelectingSystem = "";
+    private bool isCopying = false;
+    private string copyProgress = "";
+    private string copyStatus = "";
+    private int copyPercentage = 0;
+    private string statusMessage = "";
+    private bool isSuccess = false;
+
+    private int totalSelectedFiles => romSystems.Sum(s => s.SelectedFiles.Count);
+    private int systemsWithFiles => romSystems.Count(s => s.SelectedFiles.Count > 0);
+
+    private List<RomSystem> romSystems = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Get the extracted path from route parameter or query string
+        if (!string.IsNullOrEmpty(ExtractedPath))
+        {
+            extractedPath = Uri.UnescapeDataString(ExtractedPath);
+        }
+        else
+        {
+            // Try to get from query string as fallback
+            var uri = new Uri(Navigation.Uri);
+            var query = uri.Query;
+            if (!string.IsNullOrEmpty(query))
+            {
+                var queryParams = HttpUtility.ParseQueryString(query);
+                var pathParam = queryParams["path"];
+                if (!string.IsNullOrEmpty(pathParam))
+                {
+                    extractedPath = pathParam;
+                }
+            }
+        }
+
+        InitializeRomSystems();
+    }
+
+    private void InitializeRomSystems()
+    {
+        romSystems = new List<RomSystem>
+        {
+            new RomSystem
+            {
+                SystemName = "NES/Famicom",
+                SystemCode = "FC",
+                RomPath = $"{extractedPath}/Roms/NES (FC)",
+                SupportedFormats = new[] { ".nes", ".fds", ".zip" }
+            },
+            new RomSystem
+            {
+                SystemName = "Game Boy",
+                SystemCode = "GB",
+                RomPath = $"{extractedPath}/Roms/Game Boy (GB)",
+                SupportedFormats = new[] { ".gb", ".zip" }
+            },
+            new RomSystem
+            {
+                SystemName = "Game Boy Color",
+                SystemCode = "GBC",
+                RomPath = $"{extractedPath}/Roms/Game Boy Color (GBC)",
+                SupportedFormats = new[] { ".gbc", ".gb", ".zip" }
+            },
+            new RomSystem
+            {
+                SystemName = "Game Boy Advance",
+                SystemCode = "GBA",
+                RomPath = $"{extractedPath}/Roms/Game Boy Advance (GBA)",
+                SupportedFormats = new[] { ".gba", ".zip" }
+            },
+            new RomSystem
+            {
+                SystemName = "Mega Drive / Genesis",
+                SystemCode = "MD",
+                RomPath = $"{extractedPath}/Roms/Genesis (MD)",
+                SupportedFormats = new[] { ".md", ".gen", ".smd", ".zip" }
+            },
+            new RomSystem
+            {
+                SystemName = "Sega CD",
+                SystemCode = "SEGACD",
+                RomPath = $"{extractedPath}/Roms/Sega CD",
+                SupportedFormats = new[] { ".cue", ".iso", ".chd", ".zip" }
+            },
+            new RomSystem
+            {
+                SystemName = "PC Engine",
+                SystemCode = "PCE",
+                RomPath = $"{extractedPath}/Roms/PC Engine (PCE)",
+                SupportedFormats = new[] { ".pce", ".cue", ".iso", ".chd", ".zip" }
+            },
+            new RomSystem
+            {
+                SystemName = "Sony PlayStation",
+                SystemCode = "PS",
+                RomPath = $"{extractedPath}/Roms/PlayStation (PS)",
+                SupportedFormats = new[] { ".cue", ".iso", ".chd", ".pbp", ".zip" }
+            },
+            new RomSystem
+            {
+                SystemName = "Arcade",
+                SystemCode = "FBN",
+                RomPath = $"{extractedPath}/Roms/Arcade (FBN)",
+                SupportedFormats = new[] { ".zip" }
+            }
+        };
+    }
+
+    private async Task SelectRomFiles(RomSystem system)
+    {
+        try
+        {
+            isSelectingFiles = true;
+            currentSelectingSystem = system.SystemCode;
+            StateHasChanged();
+
+            var options = new PickOptions()
+            {
+                PickerTitle = $"Select ROM files for {system.SystemName}",
+            };
+
+            var results = await FilePicker.Default.PickMultipleAsync(options);
+
+            if (results != null && results.Any())
+            {
+                var validFiles = new List<FileResult>();
+                var invalidFiles = new List<string>();
+
+                foreach (var file in results)
+                {
+                    var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+                    if (system.SupportedFormats.Contains(extension))
+                    {
+                        validFiles.Add(file);
+                    }
+                    else
+                    {
+                        invalidFiles.Add(file.FileName);
+                    }
+                }
+
+                // Add valid files to the system
+                system.SelectedFiles.AddRange(validFiles);
+
+                if (validFiles.Count > 0)
+                {
+                    statusMessage = $"Added {validFiles.Count} ROM file(s) to {system.SystemName}";
+                    if (invalidFiles.Count > 0)
+                    {
+                        statusMessage += $". {invalidFiles.Count} file(s) were skipped due to unsupported format.";
+                    }
+                    isSuccess = true;
+                }
+                else
+                {
+                    statusMessage = $"No valid ROM files selected for {system.SystemName}. Supported formats: {string.Join(", ", system.SupportedFormats)}";
+                    isSuccess = false;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            statusMessage = $"Error selecting ROM files: {ex.Message}";
+            isSuccess = false;
+        }
+        finally
+        {
+            isSelectingFiles = false;
+            currentSelectingSystem = "";
+            StateHasChanged();
+        }
+    }
+
+    private void RemoveFile(RomSystem system, FileResult file)
+    {
+        system.SelectedFiles.Remove(file);
+        StateHasChanged();
+    }
+
+    private void ClearSystemSelection(RomSystem system)
+    {
+        system.SelectedFiles.Clear();
+        statusMessage = $"Cleared all ROM files for {system.SystemName}";
+        isSuccess = true;
+        StateHasChanged();
+    }
+
+    private void ClearAllSelections()
+    {
+        foreach (var system in romSystems)
+        {
+            system.SelectedFiles.Clear();
+        }
+        statusMessage = "All ROM selections cleared.";
+        isSuccess = true;
+        StateHasChanged();
+    }
+
+    private async Task CopyRomsToDirectories()
+    {
+        var allSelectedFiles = romSystems
+            .SelectMany(s => s.SelectedFiles.Select(f => new { System = s, File = f }))
+            .ToList();
+
+        if (allSelectedFiles.Count == 0)
+        {
+            statusMessage = "No ROM files selected to copy.";
+            isSuccess = false;
+            StateHasChanged();
+            return;
+        }
+
+        try
+        {
+            isCopying = true;
+            copyPercentage = 0;
+            copyProgress = "Copying...";
+            copyStatus = "Preparing to copy ROM files...";
+            StateHasChanged();
+
+            for (int i = 0; i < allSelectedFiles.Count; i++)
+            {
+                var item = allSelectedFiles[i];
+                var system = item.System;
+                var file = item.File;
+
+                copyStatus = $"Copying {file.FileName} to {system.SystemName} ({i + 1} of {allSelectedFiles.Count})";
+                copyPercentage = (int)((i * 100) / allSelectedFiles.Count);
+                StateHasChanged();
+
+                // Create directory if it doesn't exist
+                if (!Directory.Exists(system.RomPath))
+                {
+                    Directory.CreateDirectory(system.RomPath);
+                }
+
+                // Copy the file
+                var destinationPath = Path.Combine(system.RomPath, file.FileName);
+                File.Copy(file.FullPath, destinationPath, true);
+
+                // Small delay for UI feedback
+                await Task.Delay(100);
+            }
+
+            copyPercentage = 100;
+            copyProgress = "Complete!";
+            copyStatus = "All ROM files copied successfully";
+
+            var systemsCopied = romSystems.Where(s => s.SelectedFiles.Count > 0).Count();
+            statusMessage = $"Successfully copied {allSelectedFiles.Count} ROM file(s) to {systemsCopied} system(s).";
+            isSuccess = true;
+            StateHasChanged();
+
+            // Reset after 3 seconds
+            await Task.Delay(3000);
+            isCopying = false;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            isCopying = false;
+            statusMessage = $"Error copying ROM files: {ex.Message}";
+            isSuccess = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SkipRomSetup()
+    {
+        statusMessage = "ROM setup skipped. You can add ROM files later by copying them to the appropriate system directories.";
+        isSuccess = true;
+        StateHasChanged();
+
+        // In a real app, you'd navigate to the next page or complete the setup
+        await Task.Delay(2000);
+        // Navigation.NavigateTo("/setup-complete"); // Example navigation
+    }
+
+    // Method to set the extracted path (call this when navigating from another page)
+    public void SetExtractedPath(string path)
+    {
+        extractedPath = path;
+        InitializeRomSystems(); // Reinitialize with the correct paths
+        StateHasChanged();
+    }
+
+    public class RomSystem
+    {
+        public string SystemName { get; set; } = "";
+        public string SystemCode { get; set; } = "";
+        public string RomPath { get; set; } = "";
+        public string[] SupportedFormats { get; set; } = Array.Empty<string>();
+        public List<FileResult> SelectedFiles { get; set; } = new();
+    }
+}
