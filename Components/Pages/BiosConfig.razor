@@ -454,7 +454,7 @@
         font-size: 0.9em;
     }
 
-    .media (max-width: 768px) {
+    @@media (max-width: 768px) {
         .bios-file-row
 
     {
@@ -923,6 +923,7 @@
     {
         public string Id { get; set; } = "";
         public string FileName { get; set; } = "";
+        //TODO dynamically construct ExpectedPath
         public string ExpectedPath { get; set; } = "";
         public string SelectedPath { get; set; } = "";
         public string Sha1 { get; set; } = "";
