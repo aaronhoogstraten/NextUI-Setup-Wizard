@@ -524,170 +524,158 @@
 
     private void InitializeBiosSystems()
     {
+        var biosRootPath = Path.Combine(extractedPath, "Bios");
+
         biosSystems = new List<BiosSystem>
         {
-            new BiosSystem
-            {
-                SystemName = "NES/Famicom",
-                SystemCode = "FC",
-                BiosFiles = new List<BiosFile>
+            new BiosSystem(
+                biosRootPath,
+                systemName:"NES/Famicom",
+                systemCode:"FC",
+                new List<BiosFile>
                 {
                     new BiosFile
                     {
-                        Id = "fc_disksys",
                         FileName = "disksys.rom",
-                        ExpectedPath = $"{extractedPath}/Bios/FC/disksys.rom",
+                        SystemCode = "FC",
                         Sha1 = "57fe1bdee955bb48d357e463ccbf129496930b62",
                     }
                 }
-            },
-            new BiosSystem
-            {
-                SystemName = "Game Boy",
-                SystemCode = "GB",
-                BiosFiles = new List<BiosFile>
+            ),
+            new BiosSystem(
+                biosRootPath,
+                systemName:"Game Boy",
+                systemCode:"GB",
+                new List<BiosFile>
                 {
                     new BiosFile
                     {
-                        Id = "gb_bios",
                         FileName = "gb_bios.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/GB/gb_bios.bin",
+                        SystemCode = "GB",
                         Sha1 = "4ed31ec6b0b175bb109c0eb5fd3d193da823339f",
                     }
                 }
-            },
-            new BiosSystem
-            {
-                SystemName = "Game Boy Color",
-                SystemCode = "GBC",
-                BiosFiles = new List<BiosFile>
+            ),
+            new BiosSystem(
+                biosRootPath,
+                systemName:"Game Boy Color",
+                systemCode:"GBC",
+                new List<BiosFile>
                 {
                     new BiosFile
                     {
-                        Id = "gbc_bios",
                         FileName = "gbc_bios.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/GBC/gbc_bios.bin",
+                        SystemCode = "GBC",
                         Sha1 = "1293d68bf9643bc4f36954c1e80e38f39864528d",
                     }
                 }
-            },
-            new BiosSystem
-            {
-                SystemName = "Game Boy Advance",
-                SystemCode = "GBA / MGBA",
-                BiosFiles = new List<BiosFile>
+            ),
+            new BiosSystem(
+                biosRootPath,
+                systemName:"Game Boy Advance",
+                systemCode:"GBA / MGBA",
+                new List<BiosFile>
                 {
                     new BiosFile
                     {
-                        Id = "gba_bios_gba",
                         FileName = "gba_bios.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/GBA/gba_bios.bin",
+                        SystemCode = "GBA",
                         Sha1 = "300c20df6731a33952ded8c436f7f186d25d3492",
                     },
                     new BiosFile
                     {
-                        Id = "gba_bios_mgba",
                         FileName = "gba_bios.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/MGBA/gba_bios.bin",
+                        SystemCode = "MGBA",
                         Sha1 = "300c20df6731a33952ded8c436f7f186d25d3492",
                     }
                 }
-            },
-            new BiosSystem
-            {
-                SystemName = "Mega Drive / Genesis / Sega CD",
-                SystemCode = "MD / Sega CD",
-                BiosFiles = new List<BiosFile>
+            ),
+            new BiosSystem(
+                biosRootPath,
+                systemName:"Mega Drive / Genesis / Sega CD",
+                systemCode:"MD / Sega CD",
+                new List<BiosFile>
                 {
                     new BiosFile
                     {
-                        Id = "md_bios_cd_e",
                         FileName = "bios_CD_E.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/MD/bios_CD_E.bin",
+                        SystemCode = "MD",
                         Sha1 = "f891e0ea651e2232af0c5c4cb46a0cae2ee8f356",
                     },
                     new BiosFile
                     {
-                        Id = "md_bios_cd_j",
                         FileName = "bios_CD_J.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/MD/bios_CD_J.bin",
+                        SystemCode = "MD",
                         Sha1 = "4846f448160059a7da0215a5df12ca160f26dd69",
                     },
                     new BiosFile
                     {
-                        Id = "md_bios_cd_u",
                         FileName = "bios_CD_U.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/MD/bios_CD_U.bin",
+                        SystemCode = "MD",
                         Sha1 = "f4f315adcef9b8feb0364c21ab7f0eaf5457f3ed",
                     },
                     new BiosFile
                     {
-                        Id = "segacd_bios_cd_e",
                         FileName = "bios_CD_E.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/SEGACD/bios_CD_E.bin",
+                        SystemCode = "SEGACD",
                         Sha1 = "f891e0ea651e2232af0c5c4cb46a0cae2ee8f356",
                     },
                     new BiosFile
                     {
-                        Id = "segacd_bios_cd_j",
                         FileName = "bios_CD_J.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/SEGACD/bios_CD_J.bin",
+                        SystemCode = "SEGACD",
                         Sha1 = "4846f448160059a7da0215a5df12ca160f26dd69",
                     },
                     new BiosFile
                     {
-                        Id = "segacd_bios_cd_u",
                         FileName = "bios_CD_U.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/SEGACD/bios_CD_U.bin",
+                        SystemCode = "SEGACD",
                         Sha1 = "f4f315adcef9b8feb0364c21ab7f0eaf5457f3ed",
                     }
                 }
-            },
-            new BiosSystem
-            {
-                SystemName = "PC Engine",
-                SystemCode = "PCE",
-                BiosFiles = new List<BiosFile>
+            ),
+            new BiosSystem(
+                biosRootPath,
+                systemName:"PC Engine",
+                systemCode:"PCE",
+                new List<BiosFile>
                 {
                     new BiosFile
                     {
-                        Id = "pce_syscard3",
                         FileName = "syscard3.pce",
-                        ExpectedPath = $"{extractedPath}/Bios/PCE/syscard3.pce",
+                        SystemCode = "PCE",
                         Sha1 = "79f5ff55dd10187c7fd7b8daab0b3ffbd1f56a2c",
                     }
                 }
-            },
-            new BiosSystem
-            {
-                SystemName = "Sony PlayStation",
-                SystemCode = "PS",
-                BiosFiles = new List<BiosFile>
+            ),
+            new BiosSystem(
+                biosRootPath,
+                systemName:"Sony PlayStation",
+                systemCode:"PS",
+                new List<BiosFile>
                 {
                     new BiosFile
                     {
-                        Id = "ps_psxonpsp660",
                         FileName = "psxonpsp660.bin",
-                        ExpectedPath = $"{extractedPath}/Bios/PS/psxonpsp660.bin",
+                        SystemCode = "PS",
                         Sha1 = "96880d1ca92a016ff054be5159bb06fe03cb4e14",
                     }
                 }
-            },
-            new BiosSystem
-            {
-                SystemName = "Arcade",
-                SystemCode = "FBN",
-                BiosFiles = new List<BiosFile>
+            ),
+            new BiosSystem(
+                biosRootPath,
+                systemName:"Arcade",
+                systemCode:"FBN",
+                new List<BiosFile>
                 {
                     new BiosFile
                     {
-                        Id = "neogeo",
                         FileName = "neogeo.zip",
-                        ExpectedPath = $"{extractedPath}/Roms/Arcade (FBN)/neogeo.zip",
+                        SystemCode = "FBN",
                         Sha1 = "deb62b0074b8cae4f162c257662136733cfc76ad",
                     }
                 }
-            }
+            ),
         };
     }
 
@@ -833,7 +821,7 @@
                 // Copy the file
                 File.Copy(biosFile.SelectedPath, biosFile.ExpectedPath, true);
 
-                if (biosFile.Id == "neogeo")
+                if (biosFile.FileName == "neogeo.zip")
                 {
                     var mapTxtPath = biosFile.ExpectedPath.Replace(biosFile.FileName, "");
                     using (StreamWriter sw = File.CreateText(Path.Combine(mapTxtPath, "map.txt")))
@@ -917,13 +905,25 @@
         public string SystemName { get; set; } = "";
         public string SystemCode { get; set; } = "";
         public List<BiosFile> BiosFiles { get; set; } = new();
+
+        public BiosSystem(string biosRootPath, string systemName, string systemCode, List<BiosFile> biosFiles)
+        {
+            SystemName = systemName;
+            SystemCode = systemCode;
+            BiosFiles = biosFiles;
+
+            foreach (var biosFile in BiosFiles)
+            {
+                biosFile.ExpectedPath = Path.Combine(biosRootPath, biosFile.SystemCode, biosFile.FileName);
+            }
+
+        }
     }
 
     public class BiosFile
     {
-        public string Id { get; set; } = "";
         public string FileName { get; set; } = "";
-        //TODO dynamically construct ExpectedPath
+        public string SystemCode { get; set; } = "";
         public string ExpectedPath { get; set; } = "";
         public string SelectedPath { get; set; } = "";
         public string Sha1 { get; set; } = "";
