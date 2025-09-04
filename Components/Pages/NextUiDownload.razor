@@ -1,4 +1,5 @@
 ﻿@page "/release-info"
+@page "/release-info/{SelectedPath}"
 @using System.Net.Http
 @using System.Text.RegularExpressions
 @using System.IO.Compression
@@ -9,7 +10,14 @@
 
 <div class="release-container">
     <h3>Latest NextUI Release</h3>
-    
+
+    @if (!string.IsNullOrEmpty(SelectedPath))
+    {
+        <div class="path-info">
+            <p><strong>NextUI Installation Path:</strong> @SelectedPath</p>
+        </div>
+    }
+
     @if (isLoading)
     {
         <div class="loading">
@@ -448,6 +456,9 @@
 </style>
 
 @code {
+    [Parameter] public string? SelectedPath { get; set; }
+
+    private string selectedPath = "";
     private GitHubRelease? latestRelease;
     private bool isLoading = true;
     private string? errorMessage;
@@ -462,6 +473,12 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Get the selected path from route parameter or query string
+        if (!string.IsNullOrEmpty(SelectedPath))
+        {
+            selectedPath = Uri.UnescapeDataString(SelectedPath);
+        }
+
         await LoadReleaseInfo();
     }
 
@@ -659,18 +676,28 @@
             downloadStatus = "Selecting download directory...";
             StateHasChanged();
 
-            // Pick folder for extraction
-            var folderResult = await FolderPicker.Default.PickAsync(CancellationToken.None);
-            if (folderResult == null || !folderResult.IsSuccessful)
-            {
-                isDownloading = false;
-                downloadMessage = "Download cancelled - no directory selected";
-                downloadSuccess = false;
-                StateHasChanged();
-                return;
-            }
 
-            var extractPath = folderResult.Folder.Path;
+            string extractPath = null;
+
+            if (!string.IsNullOrEmpty(selectedPath))
+            {
+                extractPath = selectedPath;
+            }
+            else
+            {
+                // Pick folder for extraction
+                var folderResult = await FolderPicker.Default.PickAsync(CancellationToken.None);
+                if (folderResult == null || !folderResult.IsSuccessful)
+                {
+                    isDownloading = false;
+                    downloadMessage = "Download cancelled - no directory selected";
+                    downloadSuccess = false;
+                    StateHasChanged();
+                    return;
+                }
+
+                extractPath = folderResult.Folder.Path;
+            }
 
             // Validate that the directory is empty
             downloadStatus = "Validating directory...";
@@ -858,21 +885,7 @@
                 return true; // Directory doesn't exist, so it's "empty"
             }
             
-            // Check for any files
-            var files = Directory.GetFiles(directoryPath, "*", SearchOption.AllDirectories);
-            if (files.Length > 0)
-            {
-                return false;
-            }
-            
-            // Check for any subdirectories (excluding system directories like .DS_Store parent folders)
-            var directories = Directory.GetDirectories(directoryPath, "*", SearchOption.AllDirectories);
-            if (directories.Length > 0)
-            {
-                return false;
-            }
-            
-            // Check for any entries in the root directory (including hidden files)
+            // Check for any entries in the root directory (including subdirectories and hidden files)
             var entries = Directory.GetFileSystemEntries(directoryPath);
             
             // Filter out common hidden system files that we might want to ignore
@@ -880,9 +893,9 @@
             {
                 var fileName = Path.GetFileName(entry);
                 return !IsSystemFile(fileName);
-            }).ToArray();
+            });
             
-            return filteredEntries.Length == 0;
+            return !filteredEntries.Any();
         }
         catch (Exception)
         {
@@ -899,6 +912,8 @@
         // Common system files to ignore
         var systemFiles = new[]
         {
+            "System Volume Information",    // Windows
+            "WPSettings.dat",   // Windows
             ".DS_Store",      // macOS
             "Thumbs.db",      // Windows
             "desktop.ini",    // Windows

@@ -1,0 +1,687 @@
+﻿@page "/sd-card-prep"
+@using System.IO
+@using CommunityToolkit.Maui.Storage
+@using NextUI_Setup_Wizard.Resources
+@inject NavigationManager Navigation
+
+<div class="sd-card-container">
+    <h3>SD Card Preparation</h3>
+
+    @if (currentStep == Step.Instructions)
+    {
+        <div class="instructions-section">
+            <div class="step-header">
+                <h4>Step 1: Insert and Format Your SD Card</h4>
+                <div class="step-indicator">1 of 2</div>
+            </div>
+
+            <div class="warning-box">
+                <h5>⚠️ Important Warning</h5>
+                <p><strong>Formatting will erase all data on your SD card.</strong> Please backup any important files before proceeding.</p>
+            </div>
+
+            <div class="instructions">
+                <ol>
+                    <li><strong>Insert your SD card</strong> into your computer's SD card reader</li>
+                    <li><strong>Format the SD card</strong> using the appropriate tool for your operating system:</li>
+                </ol>
+
+                <div class="platform-instructions">
+                    <div class="platform-section">
+                        <h5>🍎 macOS Users</h5>
+                        <div class="instruction-steps">
+                            <ol>
+                                <li>Open <strong>Disk Utility</strong> (Applications → Utilities → Disk Utility)</li>
+                                <li>Select your SD card from the sidebar</li>
+                                <li>Click <strong>Erase</strong></li>
+                                <li>Choose format: <strong>MS-DOS (FAT)</strong> for FAT32 or <strong>ExFAT</strong></li>
+                                <li>Set Scheme to <strong>Master Boot Record</strong></li>
+                                <li>Give it a name (e.g., "NEXTUI")</li>
+                                <li>Click <strong>Erase</strong> to format</li>
+                            </ol>
+                        </div>
+                    </div>
+
+                    <div class="platform-section">
+                        <h5>🪟 Windows Users</h5>
+                        <div class="instruction-steps">
+                            @* <p><strong>Option 1: Using Rufus (Recommended)</strong></p> *@
+                            <ol>
+                                <li>Download <a href="https://rufus.ie/" target="_blank">Rufus</a> (free tool)</li>
+                                <li>Run Rufus as administrator</li>
+                                <li>Select your SD card from the Device dropdown</li>
+                                <li>Set Partition scheme to <strong>MBR</strong></li>
+                                <li>Set File system to <strong>FAT32</strong> or <strong>exFAT</strong></li>
+                                <li>Click <strong>START</strong> to format</li>
+                            </ol>
+
+                          @*   <p><strong>Option 2: Using File Explorer</strong></p>
+                            <ol>
+                                <li>Open File Explorer and locate your SD card</li>
+                                <li>Right-click the SD card and select <strong>Format...</strong></li>
+                                <li>Choose <strong>FAT32</strong> or <strong>exFAT</strong> as file system</li>
+                                <li>Click <strong>Start</strong> to format</li>
+                            </ol> *@
+                        </div>
+                    </div>
+@* 
+                    <div class="platform-section">
+                        <h5>🐧 Linux Users</h5>
+                        <div class="instruction-steps">
+                            <ol>
+                                <li>Use your distribution's disk management tool (e.g., GParted, Disks)</li>
+                                <li>Or use command line: <code>sudo mkfs.fat -F32 /dev/sdX1</code> (replace X with your device)</li>
+                                <li>For exFAT: <code>sudo mkfs.exfat /dev/sdX1</code></li>
+                            </ol>
+                        </div>
+                    </div> *@
+                </div>
+
+                <div class="format-requirements">
+                    <h5>Format Requirements:</h5>
+                    <ul>
+                        <li><strong>Partition Scheme:</strong> Master Boot Record (MBR)</li>
+                        <li><strong>File System:</strong> FAT32 or exFAT</li>
+                        <li><strong>Size:</strong> At least 16GB recommended</li>
+                        <li><strong>Label:</strong> Any name (optional, e.g., "NEXTUI")</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-primary" @onclick="ProceedToValidation">
+                    I have formatted my SD card
+                </button>
+                <button class="btn btn-secondary" @onclick="GoBack">
+                    Go Back
+                </button>
+            </div>
+        </div>
+    }
+    else if (currentStep == Step.Validation)
+    {
+        <div class="validation-section">
+            <div class="step-header">
+                <h4>Step 2: Select Your SD Card</h4>
+                <div class="step-indicator">2 of 2</div>
+            </div>
+
+            @if (isValidating)
+            {
+                <div class="loading">
+                    <p>Validating SD card...</p>
+                </div>
+            }
+            else if (!string.IsNullOrEmpty(validationError))
+            {
+                <div class="validation-error">
+                    <h5>❌ Validation Failed</h5>
+                    <p>@validationError</p>
+                    <div class="actions">
+                        <button class="btn btn-primary" @onclick="SelectSDCard">Try Again</button>
+                        <button class="btn btn-secondary" @onclick="BackToInstructions">Back to Instructions</button>
+                    </div>
+                </div>
+            }
+            else if (validationSuccess)
+            {
+                <div class="validation-success">
+                    <h5>✅ SD Card Validated Successfully!</h5>
+                    <div class="sd-card-info">
+                        <p><strong>Path:</strong> @selectedPath</p>
+                        <p><strong>File System:</strong> @fileSystem</p>
+                        <p><strong>Partition Scheme:</strong> @partitionScheme</p>
+                        <p><strong>Total Size:</strong> @FormatBytes(totalSize)</p>
+                        <p><strong>Available Space:</strong> @FormatBytes(availableSpace)</p>
+                        <p><strong>Label:</strong> @(string.IsNullOrEmpty(volumeLabel) ? "(No label)" : volumeLabel)</p>
+                    </div>
+
+                    <div class="actions">
+                        <button class="btn btn-success" @onclick="ProceedWithSDCard">
+                            Continue with this SD card
+                        </button>
+                        <button class="btn btn-secondary" @onclick="SelectDifferentCard">
+                            Select Different SD Card
+                        </button>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="selection-prompt">
+                    <p>Please select the root directory of your formatted SD card.</p>
+                    <p class="hint">Look for your SD card in the file browser (it should appear as a removable drive).</p>
+
+                    <div class="actions">
+                        <button class="btn btn-primary" @onclick="SelectSDCard">
+                            📁 Select SD Card Directory
+                        </button>
+                        <button class="btn btn-secondary" @onclick="BackToInstructions">
+                            Back to Instructions
+                        </button>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+<style>
+    .sd-card-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .step-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        padding-bottom: 15px;
+        border-bottom: 2px solid #e1e5e9;
+    }
+
+        .step-header h4 {
+            margin: 0;
+            color: #0366d6;
+            font-size: 1.5em;
+        }
+
+    .step-indicator {
+        background: #0366d6;
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-weight: 500;
+        font-size: 0.9em;
+    }
+
+    .warning-box {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 25px;
+        border-left: 4px solid #f39c12;
+    }
+
+        .warning-box h5 {
+            margin: 0 0 8px 0;
+            color: #856404;
+            font-size: 1.1em;
+        }
+
+        .warning-box p {
+            margin: 0;
+            color: #856404;
+        }
+
+    .instructions {
+        background: #f6f8fa;
+        padding: 20px;
+        border-radius: 6px;
+        margin-bottom: 25px;
+    }
+
+        .instructions > ol {
+            margin: 0 0 20px 0;
+            padding-left: 20px;
+        }
+
+            .instructions > ol > li {
+                margin-bottom: 10px;
+                font-weight: 500;
+            }
+
+    .platform-instructions {
+        display: grid;
+        gap: 20px;
+        margin-top: 20px;
+    }
+
+    .platform-section {
+        background: white;
+        padding: 18px;
+        border-radius: 8px;
+        border: 1px solid #d0d7de;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+        .platform-section h5 {
+            margin: 0 0 12px 0;
+            color: #24292e;
+            font-size: 1.1em;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e1e5e9;
+        }
+
+    .instruction-steps ol {
+        margin: 8px 0;
+        padding-left: 20px;
+    }
+
+    .instruction-steps li {
+        margin-bottom: 6px;
+        line-height: 1.5;
+    }
+
+    .instruction-steps p {
+        margin: 12px 0 8px 0;
+        font-weight: 500;
+        color: #24292e;
+    }
+
+    .instruction-steps code {
+        background: #f3f4f6;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 0.9em;
+        color: #d73a49;
+    }
+
+    .format-requirements {
+        background: #e6fffa;
+        border: 1px solid #9ae6b4;
+        border-radius: 6px;
+        padding: 15px;
+        margin-top: 20px;
+        border-left: 4px solid #28a745;
+    }
+
+        .format-requirements h5 {
+            margin: 0 0 10px 0;
+            color: #155724;
+            font-size: 1em;
+        }
+
+        .format-requirements ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .format-requirements li {
+            margin-bottom: 4px;
+            color: #155724;
+        }
+
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: #666;
+    }
+
+    .validation-error, .validation-success {
+        padding: 20px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+    }
+
+    .validation-error {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+
+        .validation-error h5 {
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
+        }
+
+    .validation-success {
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+    }
+
+        .validation-success h5 {
+            margin: 0 0 15px 0;
+            font-size: 1.1em;
+        }
+
+    .sd-card-info {
+        background: rgba(255,255,255,0.7);
+        padding: 15px;
+        border-radius: 6px;
+        margin: 15px 0;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 0.9em;
+    }
+
+        .sd-card-info p {
+            margin: 5px 0;
+        }
+
+    .selection-prompt {
+        text-align: center;
+        padding: 30px;
+        background: #f6f8fa;
+        border-radius: 6px;
+        border: 2px dashed #d0d7de;
+    }
+
+        .selection-prompt .hint {
+            color: #586069;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+
+    .actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+
+    .btn {
+        padding: 10px 16px;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #f6f8fa;
+        color: #24292e;
+        text-decoration: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s;
+        gap: 6px;
+    }
+
+        .btn:hover {
+            background: #f3f4f6;
+            border-color: #d0d7de;
+        }
+
+    .btn-primary {
+        background: #2da44e;
+        color: white;
+        border-color: #2da44e;
+    }
+
+        .btn-primary:hover {
+            background: #2c974b;
+            border-color: #2c974b;
+        }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border-color: #6c757d;
+    }
+
+        .btn-secondary:hover {
+            background: #5c636a;
+            border-color: #5c636a;
+        }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+        border-color: #28a745;
+    }
+
+        .btn-success:hover {
+            background: #218838;
+            border-color: #1e7e34;
+        }
+
+    @@media (max-width: 768px) {
+        .sd-card-container
+
+    {
+        padding: 15px;
+    }
+
+    .step-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .actions {
+        flex-direction: column;
+    }
+
+    .btn {
+        text-align: center;
+        justify-content: center;
+    }
+
+    }
+</style>
+
+@code {
+    private enum Step
+    {
+        Instructions,
+        Validation
+    }
+
+    private Step currentStep = Step.Instructions;
+    private bool isValidating = false;
+    private string validationError = "";
+    private bool validationSuccess = false;
+    private string selectedPath = "";
+    private string fileSystem = "";
+    private long totalSize = 0;
+    private long availableSpace = 0;
+    private string volumeLabel = "";
+    private string partitionScheme = "";
+
+    private void ProceedToValidation()
+    {
+        currentStep = Step.Validation;
+        validationError = "";
+        validationSuccess = false;
+        StateHasChanged();
+    }
+
+    private void BackToInstructions()
+    {
+        currentStep = Step.Instructions;
+        validationError = "";
+        validationSuccess = false;
+        StateHasChanged();
+    }
+
+    private void GoBack()
+    {
+        // Navigate back to the previous page (likely the NextUI download page)
+        Navigation.NavigateTo("/release-info");
+    }
+
+    private async Task SelectSDCard()
+    {
+        try
+        {
+            isValidating = true;
+            validationError = "";
+            validationSuccess = false;
+            StateHasChanged();
+
+            // Use folder picker to select SD card root
+            var folderResult = await FolderPicker.Default.PickAsync(CancellationToken.None);
+            if (folderResult == null || !folderResult.IsSuccessful)
+            {
+                isValidating = false;
+                validationError = "No directory selected. Please select your SD card's root directory.";
+                StateHasChanged();
+                return;
+            }
+
+            selectedPath = folderResult.Folder.Path;
+
+            // Validate the selected path
+            await ValidateSDCard(selectedPath);
+        }
+        catch (Exception ex)
+        {
+            isValidating = false;
+            validationError = $"Error selecting directory: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private async Task ValidateSDCard(string path)
+    {
+        try
+        {
+            await Task.Delay(500); // Small delay for UX
+
+            // Get the drive info for the selected path
+            var drives = DriveInfo.GetDrives();
+            DriveInfo? targetDrive = null;
+
+            // Find the drive that contains this path
+            foreach (var drive in drives)
+            {
+                try
+                {
+                    if (path.StartsWith(drive.RootDirectory.FullName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetDrive = drive;
+                        break;
+                    }
+                }
+                catch
+                {
+                    // Skip drives that can't be accessed
+                    continue;
+                }
+            }
+
+            if (targetDrive == null)
+            {
+                validationError = "Could not identify the drive for the selected path. Please ensure you've selected the root directory of your SD card.";
+                isValidating = false;
+                StateHasChanged();
+                return;
+            }
+
+            // Check if it's a removable drive (typical for SD cards)
+            if (targetDrive.DriveType != DriveType.Removable && targetDrive.DriveType != DriveType.Fixed)
+            {
+                validationError = $"The selected drive appears to be a {targetDrive.DriveType} drive. Please select a removable SD card.";
+                isValidating = false;
+                StateHasChanged();
+                return;
+            }
+
+            // Check if drive is ready
+            if (!targetDrive.IsReady)
+            {
+                validationError = "The selected drive is not ready. Please ensure your SD card is properly inserted and try again.";
+                isValidating = false;
+                StateHasChanged();
+                return;
+            }
+
+            // Get file system information
+            fileSystem = targetDrive.DriveFormat.ToUpperInvariant();
+
+            // Validate file system
+            if (fileSystem != "FAT32" && fileSystem != "EXFAT" && fileSystem != "FAT")
+            {
+                validationError = $"Invalid file system detected: {fileSystem}. Please format your SD card to FAT32 or exFAT and try again.";
+                isValidating = false;
+                StateHasChanged();
+                return;
+            }
+
+            // Get size information
+            totalSize = targetDrive.TotalSize;
+            availableSpace = targetDrive.AvailableFreeSpace;
+
+            // Get volume label
+            volumeLabel = string.IsNullOrEmpty(targetDrive.VolumeLabel) ? "" : targetDrive.VolumeLabel;
+
+            // Check if the SD card has enough space (at least 100MB for NextUI)
+            const long minimumSpace = 100 * 1024 * 1024; // 100MB
+            if (availableSpace < minimumSpace)
+            {
+                validationError = $"Insufficient space on SD card. Available: {FormatBytes(availableSpace)}, Required: {FormatBytes(minimumSpace)}";
+                isValidating = false;
+                StateHasChanged();
+                return;
+            }
+
+            // Check if SD card is relatively empty (less than 10% used, or less than 1GB used)
+            var usedSpace = totalSize - availableSpace;
+            var usagePercentage = (double)usedSpace / totalSize * 100;
+            const long maxUsedSpace = 1024 * 1024 * 1024; // 1GB
+
+            if (usagePercentage > 10 && usedSpace > maxUsedSpace)
+            {
+                validationError = $"SD card appears to contain significant data ({FormatBytes(usedSpace)} used, {usagePercentage:F1}% full). Please use a freshly formatted SD card to avoid conflicts.";
+                isValidating = false;
+                StateHasChanged();
+                return;
+            }
+
+            var partitionInfo = await PartitionSchemeDetector.DetectPartitionScheme(path);
+
+            if (!string.IsNullOrEmpty(partitionInfo.ErrorMessage))
+            {
+                validationError = $"Could not detect partition scheme: {partitionInfo.ErrorMessage}";
+                isValidating = false;
+                StateHasChanged();
+                return;
+            }
+            
+            if (partitionInfo.Scheme != PartitionSchemeDetector.PartitionScheme.MBR)
+            {
+                validationError = "SD card is not partitioned as Master Boot Record (MBR)";
+                isValidating = false;
+                StateHasChanged();
+                return;
+            }
+
+            partitionScheme = "Master Boot Record (MBR)";
+
+            // All validations passed
+            isValidating = false;
+            validationSuccess = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            isValidating = false;
+            validationError = $"Validation error: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private void SelectDifferentCard()
+    {
+        validationSuccess = false;
+        validationError = "";
+        selectedPath = "";
+        StateHasChanged();
+    }
+
+    private void ProceedWithSDCard()
+    {
+        // Navigate to the next step with the SD card path
+        // You might want to pass this to a deployment/copying page
+        Navigation.NavigateTo($"/release-info/{Uri.EscapeDataString(selectedPath)}");
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        if (bytes == 0) return "0 B";
+
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}
