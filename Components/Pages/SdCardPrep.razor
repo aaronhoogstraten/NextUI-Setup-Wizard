@@ -26,6 +26,10 @@
                     <li><strong>Format the SD card</strong> using the appropriate tool for your operating system:</li>
                 </ol>
 
+                <div class="info-box">
+                    <p>ℹ️ <strong>Note:</strong> fat32 or exFat format can be used. fat32 is generally considered the most stable, but exFat supports files over 4GB.</p>
+                </div>
+
                 <div class="platform-instructions">
                     <div class="platform-section">
                         <h5>🍎 macOS Users</h5>
@@ -34,9 +38,9 @@
                                 <li>Open <strong>Disk Utility</strong> (Applications → Utilities → Disk Utility)</li>
                                 <li>Select your SD card from the sidebar</li>
                                 <li>Click <strong>Erase</strong></li>
+                                <li>Give it a name (e.g. NextUI)</li>
                                 <li>Choose format: <strong>MS-DOS (FAT)</strong> for FAT32 or <strong>ExFAT</strong></li>
                                 <li>Set Scheme to <strong>Master Boot Record</strong></li>
-                                <li>Give it a name (e.g., "NEXTUI")</li>
                                 <li>Click <strong>Erase</strong> to format</li>
                             </ol>
                         </div>
@@ -48,10 +52,13 @@
                             @* <p><strong>Option 1: Using Rufus (Recommended)</strong></p> *@
                             <ol>
                                 <li>Download <a href="https://rufus.ie/" target="_blank">Rufus</a> (free tool)</li>
-                                <li>Run Rufus as administrator</li>
-                                <li>Select your SD card from the Device dropdown</li>
-                                <li>Set Partition scheme to <strong>MBR</strong></li>
-                                <li>Set File system to <strong>FAT32</strong> or <strong>exFAT</strong></li>
+                                <li>Run Rufus</li>
+                                <li>Select your SD card from the <span class="option">Device</span> dropdown</li>
+                                <li>Set <span class="option">Boot selection</span> to <strong>Non bootable</strong></li>
+                                <li>Set <span class="option"> Partition scheme</span> to <strong>MBR</strong></li>
+                                <li>Set <span class="option"> File system</span> to <strong>FAT32</strong> or <strong>exFAT</strong></li>
+                                <li>Under <span class="option"> Volume Label</span>, choose a name (e.g. NextUI) </li>
+                                <li>Make sure <span class="option"> Create extended label and icon files is</span> <strong>not</strong> selected</li>
                                 <li>Click <strong>START</strong> to format</li>
                             </ol>
 
@@ -235,10 +242,28 @@
                 font-weight: 500;
             }
 
+    .info-box {
+        background: #e1f5fe;
+        border: 1px solid #81d4fa;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-left: 4px solid #2196f3;
+    }
+
+        .info-box p {
+            margin: 0;
+            color: #0d47a1;
+        }
+
     .platform-instructions {
         display: grid;
         gap: 20px;
         margin-top: 20px;
+    }
+
+    .option {
+        color: #0d47a1;
     }
 
     .platform-section {
