@@ -99,9 +99,6 @@
                 <button class="btn btn-primary" @onclick="ProceedToValidation">
                     I have formatted my SD card
                 </button>
-                <button class="btn btn-secondary" @onclick="GoBack">
-                    Go Back
-                </button>
             </div>
         </div>
     }
@@ -513,11 +510,6 @@
         StateHasChanged();
     }
 
-    private void GoBack()
-    {
-        // Navigate back to the previous page (likely the NextUI download page)
-        Navigation.NavigateTo("/release-info");
-    }
 
     private async Task SelectSDCard()
     {
