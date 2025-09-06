@@ -135,7 +135,7 @@
                     <span>Copy ROMs (@totalSelectedFiles files)</span>
                 }
             </button>
-            <button class="btn btn-info" @onclick="SkipRomSetup">Skip ROM Setup</button>
+            <button class="btn btn-info" @onclick="SkipRomSetup">@(hasSuccessfullyCopiedFiles ? "Continue to Installation" : "Skip ROM Setup")</button>
         </div>
     </div>
 
@@ -641,6 +641,7 @@
     private int copyPercentage = 0;
     private string statusMessage = "";
     private bool isSuccess = false;
+    private bool hasSuccessfullyCopiedFiles = false;
 
     private int totalSelectedFiles => romSystems.Sum(s => s.SelectedFiles.Count);
     private int systemsWithFiles => romSystems.Count(s => s.SelectedFiles.Count > 0);
@@ -911,6 +912,7 @@
             var systemsCopied = romSystems.Where(s => s.SelectedFiles.Count > 0).Count();
             statusMessage = $"Successfully copied {allSelectedFiles.Count} ROM file(s) to {systemsCopied} system(s).";
             isSuccess = true;
+            hasSuccessfullyCopiedFiles = true;
             StateHasChanged();
 
             // Reset after 3 seconds

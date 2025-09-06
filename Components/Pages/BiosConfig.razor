@@ -111,7 +111,7 @@
                     <span>Copy Selected Files (@selectedFilesCount)</span>
                 }
             </button>
-            <button class="btn btn-info" @onclick="SkipBiosSetup">Skip BIOS Setup</button>
+            <button class="btn btn-info" @onclick="SkipBiosSetup">@(hasSuccessfullyCopiedFiles ? "Continue to ROM Setup" : "Skip BIOS Setup")</button>
         </div>
     </div>
 
@@ -490,6 +490,7 @@
     private int copyPercentage = 0;
     private string statusMessage = "";
     private bool isSuccess = false;
+    private bool hasSuccessfullyCopiedFiles = false;
 
     private int selectedFilesCount => GetUniqueSelectedFiles().Count();
     private int totalFilesCount => GetUniqueFileNames().Count();
@@ -866,6 +867,7 @@
             copyStatus = "All selected files copied successfully";
             statusMessage = $"Successfully copied {GetUniqueSelectedFiles().Count()} unique BIOS file(s) to {selectedFiles.Count} location(s).";
             isSuccess = true;
+            hasSuccessfullyCopiedFiles = true;
             StateHasChanged();
 
             // Reset after 3 seconds

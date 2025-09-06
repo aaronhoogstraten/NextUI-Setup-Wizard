@@ -69,12 +69,6 @@
                                 <a href="@asset.Url" target="_blank">
                                     @asset.Name
                                 </a>
-                                @if (!string.IsNullOrEmpty(asset.Sha256))
-                                {
-                                    <span class="asset-info">
-                                        <span class="sha-badge" title="SHA256: @asset.Sha256">✓ Verified</span>
-                                    </span>
-                                }
                             </li>
                         }
                     </ul>
@@ -90,7 +84,6 @@
             <div class="actions">
                 <a href="@latestRelease.Url" target="_blank" class="btn btn-primary">View on GitHub</a>
                 <button class="btn btn-secondary" @onclick="LoadReleaseInfo">Refresh</button>
-                <button class="btn btn-info" @onclick="SkipDownload">Skip Download</button>
                 @{
                     var allZipAsset = GetAllZipAsset();
                 }
@@ -400,15 +393,6 @@
         border: 1px solid #f5c6cb;
     }
     
-    .sha-badge {
-        background: #28a745;
-        color: white;
-        padding: 2px 6px;
-        border-radius: 3px;
-        font-size: 0.75em;
-        font-weight: bold;
-        margin-left: 8px;
-    }
     
     .no-all-zip, .no-assets-debug {
         margin-top: 15px;
@@ -704,11 +688,6 @@
         }
     }
 
-    private void SkipDownload()
-    {
-        //TODO remove
-        Navigation.NavigateTo($"/bios-config/{Uri.EscapeDataString(selectedPath)}");
-    }
 
     private void ShowDebugInfo()
     {
