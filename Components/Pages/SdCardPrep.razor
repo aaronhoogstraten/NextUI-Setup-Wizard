@@ -1,5 +1,6 @@
 ﻿@page "/sd-card-prep"
 @using System.IO
+@using System.IO.Compression
 @using CommunityToolkit.Maui.Storage
 @using NextUI_Setup_Wizard.Resources
 @inject NavigationManager Navigation
@@ -127,10 +128,54 @@
                     </div>
                 </div>
             }
+            else if (showWipeConfirmation)
+            {
+                <div class="wipe-confirmation">
+                    <h5>⚠️ Confirm SD Card Wipe</h5>
+                    <div class="warning-message">
+                        <p><strong>Warning:</strong> Your SD card contains an existing NextUI installation. Continuing with full setup will permanently delete all files on the SD card, including:</p>
+                        <ul>
+                            <li>The existing NextUI installation</li>
+                            <li>All BIOS files</li>
+                            <li>All ROM files</li>
+                            <li>Any other files on the SD card</li>
+                        </ul>
+                        <p><strong>This action cannot be undone!</strong></p>
+                    </div>
+                    
+                    @if (isWiping)
+                    {
+                        <div class="wipe-progress">
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: @(wipePercentage)%"></div>
+                            </div>
+                            <p class="progress-text">@wipeProgress</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="actions">
+                            <button class="btn btn-danger" @onclick="ConfirmWipeAndProceed">
+                                Yes, Wipe SD Card and Continue
+                            </button>
+                            <button class="btn btn-secondary" @onclick="CancelWipe">
+                                Cancel
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
             else if (validationSuccess)
             {
                 <div class="validation-success">
                     <h5>✅ SD Card Validated Successfully!</h5>
+                    @if (nextUIDetected)
+                    {
+                        <div class="nextui-detected">
+                            <h6>🎉 NextUI Installation Detected!</h6>
+                            <p>Your SD card already contains a NextUI installation. You can skip the download and setup steps and go directly to BIOS/ROM configuration.</p>
+                        </div>
+                    }
                     <div class="sd-card-info">
                         <p><strong>Path:</strong> @selectedPath</p>
                         <p><strong>File System:</strong> @fileSystem</p>
@@ -138,12 +183,28 @@
                         <p><strong>Total Size:</strong> @FormatBytes(totalSize)</p>
                         <p><strong>Available Space:</strong> @FormatBytes(availableSpace)</p>
                         <p><strong>Label:</strong> @(string.IsNullOrEmpty(volumeLabel) ? "(No label)" : volumeLabel)</p>
+                        @if (nextUIDetected)
+                        {
+                            <p><strong>NextUI Status:</strong> ✅ Installed</p>
+                        }
                     </div>
 
                     <div class="actions">
-                        <button class="btn btn-success" @onclick="ProceedWithSDCard">
-                            Continue with this SD card
-                        </button>
+                        @if (nextUIDetected)
+                        {
+                            <button class="btn btn-success" @onclick="SkipToConfiguration">
+                                Skip to BIOS/ROM Configuration
+                            </button>
+                            <button class="btn btn-primary" @onclick="ProceedWithSDCard">
+                                Continue with Full Setup
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-success" @onclick="ProceedWithSDCard">
+                                Continue with this SD card
+                            </button>
+                        }
                         <button class="btn btn-secondary" @onclick="SelectDifferentCard">
                             Select Different SD Card
                         </button>
@@ -363,6 +424,85 @@
             font-size: 1.1em;
         }
 
+    .nextui-detected {
+        background: #e7f3ff;
+        border: 1px solid #b3d9ff;
+        border-radius: 6px;
+        padding: 15px;
+        margin: 15px 0;
+        border-left: 4px solid #007acc;
+    }
+
+        .nextui-detected h6 {
+            margin: 0 0 8px 0;
+            color: #004d7a;
+            font-size: 1em;
+            font-weight: 600;
+        }
+
+        .nextui-detected p {
+            margin: 0;
+            color: #004d7a;
+            font-size: 0.9em;
+        }
+
+    .wipe-confirmation {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 6px;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-left: 4px solid #dc3545;
+    }
+
+        .wipe-confirmation h5 {
+            margin: 0 0 15px 0;
+            color: #721c24;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+
+    .warning-message {
+        background: rgba(255,255,255,0.7);
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+    }
+
+        .warning-message p {
+            margin: 8px 0;
+            color: #721c24;
+            line-height: 1.5;
+        }
+
+        .warning-message ul {
+            margin: 10px 0;
+            padding-left: 20px;
+            color: #721c24;
+        }
+
+        .warning-message li {
+            margin-bottom: 4px;
+        }
+
+    .wipe-progress {
+        margin: 15px 0;
+        padding: 15px;
+        background: rgba(255,255,255,0.7);
+        border-radius: 6px;
+    }
+
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+        border-color: #dc3545;
+    }
+
+        .btn-danger:hover {
+            background: #c82333;
+            border-color: #bd2130;
+        }
+
     .sd-card-info {
         background: rgba(255,255,255,0.7);
         padding: 15px;
@@ -493,6 +633,11 @@
     private long availableSpace = 0;
     private string volumeLabel = "";
     private string partitionScheme = "";
+    private bool nextUIDetected = false;
+    private bool showWipeConfirmation = false;
+    private bool isWiping = false;
+    private string wipeProgress = "";
+    private int wipePercentage = 0;
 
     private void ProceedToValidation()
     {
@@ -507,6 +652,9 @@
         currentStep = Step.Instructions;
         validationError = "";
         validationSuccess = false;
+        nextUIDetected = false;
+        showWipeConfirmation = false;
+        isWiping = false;
         StateHasChanged();
     }
 
@@ -659,10 +807,13 @@
 
             partitionScheme = "Master Boot Record (MBR)";
 
-            // Check if the SD card is empty (or contains only system files)
-            if (!IsDirectoryEmpty(path))
+            // Check if NextUI is already installed
+            nextUIDetected = await IsNextUIInstalled(path);
+            
+            // If NextUI is not detected, check if the SD card is empty
+            if (!nextUIDetected && !IsDirectoryEmpty(path))
             {
-                validationError = "SD card is not empty. Please use a freshly formatted SD card to avoid conflicts with existing files.";
+                validationError = "SD card is not empty and does not contain a NextUI installation. Please use a freshly formatted SD card to avoid conflicts with existing files.";
                 isValidating = false;
                 StateHasChanged();
                 return;
@@ -686,14 +837,173 @@
         validationSuccess = false;
         validationError = "";
         selectedPath = "";
+        nextUIDetected = false;
+        showWipeConfirmation = false;
+        isWiping = false;
         StateHasChanged();
     }
 
     private void ProceedWithSDCard()
     {
-        // Navigate to the next step with the SD card path
-        // You might want to pass this to a deployment/copying page
-        Navigation.NavigateTo($"/release-info/{Uri.EscapeDataString(selectedPath)}");
+        if (nextUIDetected)
+        {
+            // Show confirmation prompt to wipe existing files
+            showWipeConfirmation = true;
+            StateHasChanged();
+        }
+        else
+        {
+            // Navigate to the next step with the SD card path
+            Navigation.NavigateTo($"/release-info/{Uri.EscapeDataString(selectedPath)}");
+        }
+    }
+
+    private void SkipToConfiguration()
+    {
+        // Skip NextUI download and go directly to BIOS configuration
+        Navigation.NavigateTo($"/bios-config/{Uri.EscapeDataString(selectedPath)}");
+    }
+
+    private void CancelWipe()
+    {
+        showWipeConfirmation = false;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmWipeAndProceed()
+    {
+        try
+        {
+            isWiping = true;
+            wipeProgress = "Preparing to wipe SD card...";
+            wipePercentage = 0;
+            StateHasChanged();
+
+            await WipeSDCard(selectedPath);
+
+            // After successful wipe, proceed to NextUI download
+            Navigation.NavigateTo($"/release-info/{Uri.EscapeDataString(selectedPath)}");
+        }
+        catch (Exception ex)
+        {
+            isWiping = false;
+            validationError = $"Failed to wipe SD card: {ex.Message}";
+            showWipeConfirmation = false;
+            validationSuccess = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task WipeSDCard(string path)
+    {
+        try
+        {
+            wipeProgress = "Scanning files and directories...";
+            wipePercentage = 10;
+            StateHasChanged();
+            await Task.Delay(500);
+
+            // Get all files and directories
+            var allEntries = Directory.GetFileSystemEntries(path, "*", SearchOption.AllDirectories)
+                .OrderByDescending(p => p.Length) // Delete deepest paths first
+                .ToList();
+
+            var rootEntries = Directory.GetFileSystemEntries(path)
+                .Where(entry => !IsSystemFile(Path.GetFileName(entry)))
+                .ToList();
+
+            wipeProgress = $"Found {allEntries.Count} items to delete...";
+            wipePercentage = 20;
+            StateHasChanged();
+            await Task.Delay(500);
+
+            if (allEntries.Count == 0)
+            {
+                wipeProgress = "SD card is already empty";
+                wipePercentage = 100;
+                StateHasChanged();
+                return;
+            }
+
+            // Delete files first, then directories
+            var files = allEntries.Where(File.Exists).ToList();
+            var directories = allEntries.Where(Directory.Exists).ToList();
+
+            int totalItems = files.Count + directories.Count;
+            int processedItems = 0;
+
+            // Delete files
+            foreach (var file in files)
+            {
+                try
+                {
+                    File.SetAttributes(file, FileAttributes.Normal); // Remove read-only if set
+                    File.Delete(file);
+                    processedItems++;
+
+                    wipePercentage = 20 + (int)((processedItems * 60.0) / totalItems);
+                    wipeProgress = $"Deleting files... ({processedItems}/{totalItems})";
+                    StateHasChanged();
+
+                    if (processedItems % 10 == 0) // Update UI every 10 files
+                        await Task.Delay(10);
+                }
+                catch (Exception ex)
+                {
+                    // Log but continue with other files
+                    System.Diagnostics.Debug.WriteLine($"Failed to delete file {file}: {ex.Message}");
+                }
+            }
+
+            // Delete directories (in reverse order to delete children before parents)
+            foreach (var directory in directories.OrderByDescending(d => d.Length))
+            {
+                try
+                {
+                    if (Directory.Exists(directory))
+                    {
+                        Directory.Delete(directory, true);
+                        processedItems++;
+
+                        wipePercentage = 20 + (int)((processedItems * 60.0) / totalItems);
+                        wipeProgress = $"Deleting directories... ({processedItems}/{totalItems})";
+                        StateHasChanged();
+
+                        if (processedItems % 5 == 0) // Update UI every 5 directories
+                            await Task.Delay(10);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Log but continue with other directories
+                    System.Diagnostics.Debug.WriteLine($"Failed to delete directory {directory}: {ex.Message}");
+                }
+            }
+
+            wipeProgress = "Verifying deletion...";
+            wipePercentage = 90;
+            StateHasChanged();
+            await Task.Delay(500);
+
+            // Verify the SD card is now empty (except system files)
+            var remainingEntries = Directory.GetFileSystemEntries(path)
+                .Where(entry => !IsSystemFile(Path.GetFileName(entry)))
+                .ToList();
+
+            if (remainingEntries.Any())
+            {
+                throw new Exception($"Failed to delete all files. {remainingEntries.Count} items remain.");
+            }
+
+            wipeProgress = "SD card wiped successfully!";
+            wipePercentage = 100;
+            StateHasChanged();
+            await Task.Delay(1000);
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Wipe operation failed: {ex.Message}");
+        }
     }
 
     private string FormatBytes(long bytes)
@@ -757,5 +1067,67 @@
         };
         
         return systemFiles.Any(sf => fileName.Equals(sf, StringComparison.OrdinalIgnoreCase));
+    }
+    
+    private async Task<bool> IsNextUIInstalled(string path)
+    {
+        try
+        {
+            // Check for MinUI.zip and read .system/version.txt from inside the zip
+            var minUIZipPath = Path.Combine(path, "MinUI.zip");
+            if (await CheckVersionInZip(minUIZipPath))
+                return true;
+                
+            // Check for .system\version.txt directly on filesystem
+            var systemVersionPath = Path.Combine(path, ".system", "version.txt");
+            if (await CheckVersionFile(systemVersionPath))
+                return true;
+                
+            return false;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+    
+    private async Task<bool> CheckVersionInZip(string zipFilePath)
+    {
+        try
+        {
+            if (!File.Exists(zipFilePath))
+                return false;
+                
+            using var zip = ZipFile.OpenRead(zipFilePath);
+            var versionEntry = zip.GetEntry(".system/version.txt");
+            if (versionEntry == null)
+                return false;
+                
+            using var stream = versionEntry.Open();
+            using var reader = new StreamReader(stream);
+            var content = await reader.ReadToEndAsync();
+            
+            return content.Contains("NextUI", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+    
+    private async Task<bool> CheckVersionFile(string filePath)
+    {
+        try
+        {
+            if (!File.Exists(filePath))
+                return false;
+                
+            var content = await File.ReadAllTextAsync(filePath);
+            return content.Contains("NextUI", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 }
