@@ -933,9 +933,7 @@
         isSuccess = true;
         StateHasChanged();
 
-        // In a real app, you'd navigate to the next page or complete the setup
-        await Task.Delay(2000);
-        // Navigation.NavigateTo("/setup-complete"); // Example navigation
+        Navigation.NavigateTo("/setup-complete");
     }
 
     private void ToggleSnesSystemCode(RomSystem system)

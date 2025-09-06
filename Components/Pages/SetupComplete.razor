@@ -1,0 +1,364 @@
+﻿@page "/setup-complete"
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+
+<div class="completion-container">
+    <div class="completion-card">
+        <div class="success-header">
+            <div class="success-icon">✓</div>
+            <h2>Setup Complete!</h2>
+        </div>
+
+        <div class="completion-content">
+            <div class="congratulations-section">
+                <h3>Congratulations!</h3>
+                <p class="main-message">
+                    NextUI SD card setup complete.
+                </p>
+            </div>
+
+            <div class="instructions-section">
+                <h4>Next Steps:</h4>
+                <div class="steps-list">
+                    <div class="step-item">
+                        <span class="step-number">1</span>
+                        <span class="step-text">Safely eject the SD card from your computer</span>
+                    </div>
+                    <div class="step-item">
+                        <span class="step-number">2</span>
+                        <span class="step-text">Power off your gaming device completely</span>
+                    </div>
+                    <div class="step-item">
+                        <span class="step-number">3</span>
+                        <span class="step-text">Insert the prepared SD card into your device</span>
+                    </div>
+                    <div class="step-item">
+                        <span class="step-number">4</span>
+                        <span class="step-text">Power on the device and wait for NextUI installation</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="warning-section">
+                <div class="warning-box">
+                    <span class="warning-icon">⚠️</span>
+                    <div class="warning-content">
+                        <strong>Important:</strong> Do not remove the SD card during the installation process.
+                        The device will restart automatically when the installation is complete.
+                    </div>
+                </div>
+            </div>
+
+            <div class="congratulations-section">
+                <p class="enjoy-message">
+                    <strong>Enjoy your games!</strong>
+                </p>
+            </div>
+        </div>
+
+        <div class="completion-actions">
+            <button class="btn btn-success btn-large" @onclick="FinishSetup">
+                <span class="btn-icon">🏁</span>
+                Finish
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .completion-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .completion-card {
+        background: #ffffff;
+        border: 1px solid #d0d7de;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 600px;
+    }
+
+    .success-header {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        padding: 30px;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .success-icon {
+        width: 60px;
+        height: 60px;
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 30px;
+        font-weight: bold;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .success-header h2 {
+        margin: 0;
+        font-size: 2.2em;
+        font-weight: 600;
+    }
+
+    .completion-content {
+        padding: 30px;
+    }
+
+    .congratulations-section {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+        .congratulations-section h3 {
+            color: #28a745;
+            font-size: 1.8em;
+            margin: 0 0 15px 0;
+            font-weight: 600;
+        }
+
+    .main-message {
+        font-size: 1.1em;
+        line-height: 1.6;
+        color: #495057;
+        margin: 0 0 15px 0;
+    }
+
+    .enjoy-message {
+        font-size: 1.3em;
+        color: #28a745;
+        margin: 0;
+    }
+
+    .instructions-section {
+        margin-bottom: 25px;
+    }
+
+        .instructions-section h4 {
+            color: #24292e;
+            font-size: 1.2em;
+            margin: 0 0 15px 0;
+            font-weight: 600;
+        }
+
+    .steps-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .step-item {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 12px 15px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #28a745;
+    }
+
+    .step-number {
+        width: 28px;
+        height: 28px;
+        background: #28a745;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 14px;
+        font-weight: 600;
+        flex-shrink: 0;
+    }
+
+    .step-text {
+        color: #495057;
+        font-size: 1em;
+        line-height: 1.4;
+    }
+
+    .warning-section {
+        margin-bottom: 30px;
+    }
+
+    .warning-box {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 8px;
+        padding: 15px;
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .warning-icon {
+        font-size: 20px;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .warning-content {
+        color: #856404;
+        font-size: 0.95em;
+        line-height: 1.5;
+    }
+
+    .completion-actions {
+        padding: 0 30px 30px 30px;
+        text-align: center;
+    }
+
+    .btn {
+        padding: 12px 24px;
+        border: 1px solid #d0d7de;
+        border-radius: 8px;
+        background: #f6f8fa;
+        color: #24292e;
+        text-decoration: none;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+        white-space: nowrap;
+        min-width: 140px;
+        justify-content: center;
+    }
+
+        .btn:hover {
+            background: #f3f4f6;
+            border-color: #d0d7de;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+        border-color: #28a745;
+    }
+
+        .btn-success:hover {
+            background: #218838;
+            border-color: #1e7e34;
+        }
+
+    .btn-large {
+        padding: 15px 30px;
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .btn-icon {
+        font-size: 18px;
+    }
+
+    @@media (max-width: 768px) {
+        .completion-container
+
+    {
+        padding: 15px;
+        align-items: flex-start;
+        padding-top: 40px;
+    }
+
+    .success-header {
+        padding: 25px 20px;
+    }
+
+        .success-header h2 {
+            font-size: 1.8em;
+        }
+
+    .completion-content {
+        padding: 25px 20px;
+    }
+
+    .congratulations-section h3 {
+        font-size: 1.5em;
+    }
+
+    .main-message {
+        font-size: 1em;
+    }
+
+    .completion-actions {
+        padding: 0 20px 25px 20px;
+    }
+
+    .step-item {
+        padding: 10px 12px;
+    }
+
+    .step-text {
+        font-size: 0.95em;
+    }
+
+    }
+
+    @@media (max-width: 480px) {
+        .btn-large
+
+    {
+        width: 100%;
+        padding: 12px 20px;
+        font-size: 16px;
+    }
+
+    .success-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 24px;
+    }
+
+    }
+</style>
+
+@code {
+    private async Task FinishSetup()
+    {
+        try
+        {
+            // Close the application
+            await JSRuntime.InvokeVoidAsync("eval", "window.close()");
+
+            // If window.close() doesn't work (which it might not in some contexts),
+            // try alternative methods or show a message
+            await Task.Delay(1000);
+
+            // For MAUI applications, you might need to use platform-specific code
+            // This would typically be handled through dependency injection
+            // For now, we'll navigate to a fallback or show instructions
+
+#if ANDROID || IOS || MACCATALYST || WINDOWS
+            // In a real MAUI app, you would inject a platform service here
+            // and call something like: await PlatformService.ExitApplication();
+            Application.Current?.Quit();
+#endif
+        }
+        catch (Exception)
+        {
+            // If we can't close the application programmatically,
+            // we could show instructions to manually close it
+            await JSRuntime.InvokeVoidAsync("alert", "Please close this application window manually.");
+        }
+    }
+}
