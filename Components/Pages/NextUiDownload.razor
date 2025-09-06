@@ -510,10 +510,12 @@
                     response = await Http.GetAsync($"https://github.com/LoveRetro/NextUI/releases/expanded_assets/{latestRelease.TagName}");
                     content = await response.Content.ReadAsStringAsync();
 
-                    //TODO Use regex to parse the releaseAssetName and the sha256 from the -all.zip section instead of making assumptions about the format and that the first sha256 match is the -all.zip one
-                    var releaseAssetName = $"NextUI-{latestRelease.PublishedDateTime.ToString("yyyyMMdd")}-0-all.zip";
-                    var sha256Matches = Regex.Matches(content, @"sha256:([a-fA-F0-9]{64})", RegexOptions.IgnoreCase | RegexOptions.Multiline);
-                    latestRelease.Assets.Add(new GitHubAsset { Url = $"https://github.com/LoveRetro/NextUI/releases/download/{latestRelease.TagName}/{releaseAssetName}", Name = releaseAssetName, Sha256 = sha256Matches[0].Value.Replace("sha256:", "") });
+                    // Parse the actual -all.zip asset and its SHA256 from the expanded assets page
+                    var allZipAsset = ParseAllZipAssetFromExpandedAssets(content);
+                    if (allZipAsset != null)
+                    {
+                        latestRelease.Assets.Add(allZipAsset);
+                    }
                 }
 
 
@@ -641,6 +643,65 @@
             a.Name.Contains("all.zip", StringComparison.OrdinalIgnoreCase) ||
             a.Name.EndsWith("-all.zip", StringComparison.OrdinalIgnoreCase) ||
             a.Name.EndsWith("_all.zip", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private GitHubAsset? ParseAllZipAssetFromExpandedAssets(string expandedAssetsHtml)
+    {
+        try
+        {
+            var downloadPattern = @"href=""(/LoveRetro/NextUI/releases/download/[^""]*-all\.zip)""";
+            var downloadMatches = Regex.Matches(expandedAssetsHtml, downloadPattern, RegexOptions.IgnoreCase);
+            
+            if (downloadMatches.Count > 0)
+            {
+                var relativePath = downloadMatches[0].Groups[1].Value;
+                var fileName = Path.GetFileName(relativePath);
+                
+                var sha256Pattern = @"sha256:([a-fA-F0-9]{64})";
+                var sha256Match = Regex.Match(expandedAssetsHtml, sha256Pattern, RegexOptions.IgnoreCase);
+                
+                if (sha256Match.Success)
+                {
+                    var sha256 = sha256Match.Groups[1].Value.ToLowerInvariant();
+                    var downloadUrl = $"https://github.com{relativePath}";
+                    
+                    return new GitHubAsset 
+                    { 
+                        Name = fileName, 
+                        Url = downloadUrl, 
+                        Sha256 = sha256 
+                    };
+                }
+            }
+            
+            return null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+    
+    private string GetFileSectionFromHtml(string html, string fileName)
+    {
+        try
+        {
+            // Find the section of HTML that contains information about this specific file
+            // We'll look for the file name and extract a reasonable section around it
+            var fileIndex = html.IndexOf(fileName, StringComparison.OrdinalIgnoreCase);
+            if (fileIndex == -1)
+                return html;
+                
+            // Extract a section around the file mention (e.g., 500 characters before and after)
+            var startIndex = Math.Max(0, fileIndex - 500);
+            var endIndex = Math.Min(html.Length, fileIndex + fileName.Length + 500);
+            
+            return html.Substring(startIndex, endIndex - startIndex);
+        }
+        catch (Exception)
+        {
+            return html;
+        }
     }
 
     private void SkipDownload()
