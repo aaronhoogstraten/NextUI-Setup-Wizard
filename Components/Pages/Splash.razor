@@ -83,8 +83,8 @@
 @code {
     protected override async Task OnInitializedAsync()
     {
-        // Show splash screen for 2.5 seconds, then navigate to SD Card Prep
-        await Task.Delay(2500);
+        // Show splash screen for 1.5 seconds, then navigate to SD Card Prep
+        await Task.Delay(1500);
         Navigation.NavigateTo("/sd-card-prep", true);
     }
 }
