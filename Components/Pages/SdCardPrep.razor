@@ -659,6 +659,15 @@
 
             partitionScheme = "Master Boot Record (MBR)";
 
+            // Check if the SD card is empty (or contains only system files)
+            if (!IsDirectoryEmpty(path))
+            {
+                validationError = "SD card is not empty. Please use a freshly formatted SD card to avoid conflicts with existing files.";
+                isValidating = false;
+                StateHasChanged();
+                return;
+            }
+
             // All validations passed
             isValidating = false;
             validationSuccess = true;
@@ -700,5 +709,53 @@
             len = len / 1024;
         }
         return $"{len:0.##} {sizes[order]}";
+    }
+    
+    private bool IsDirectoryEmpty(string directoryPath)
+    {
+        try
+        {
+            if (!Directory.Exists(directoryPath))
+            {
+                return true; // Directory doesn't exist, so it's "empty"
+            }
+            
+            // Check for any entries in the root directory (including subdirectories and hidden files)
+            var entries = Directory.GetFileSystemEntries(directoryPath);
+            
+            // Filter out common hidden system files that we might want to ignore
+            var filteredEntries = entries.Where(entry =>
+            {
+                var fileName = Path.GetFileName(entry);
+                return !IsSystemFile(fileName);
+            });
+            
+            return !filteredEntries.Any();
+        }
+        catch (Exception)
+        {
+            // If we can't read the directory, assume it's not empty for safety
+            return false;
+        }
+    }
+    
+    private bool IsSystemFile(string fileName)
+    {
+        if (string.IsNullOrEmpty(fileName))
+            return false;
+            
+        // Common system files to ignore
+        var systemFiles = new[]
+        {
+            "System Volume Information",    // Windows
+            "WPSettings.dat",   // Windows
+            ".DS_Store",      // macOS
+            "Thumbs.db",      // Windows
+            "desktop.ini",    // Windows
+            "._.DS_Store",    // macOS resource fork
+            "__MACOSX"        // macOS archive metadata
+        };
+        
+        return systemFiles.Any(sf => fileName.Equals(sf, StringComparison.OrdinalIgnoreCase));
     }
 }
