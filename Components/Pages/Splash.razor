@@ -1,0 +1,90 @@
+@page "/splash"
+@inject NavigationManager Navigation
+
+<div class="splash-container">
+    <div class="splash-content">
+        <h1 class="splash-title">NextUI Installation Tool</h1>
+        <div class="loading-spinner"></div>
+    </div>
+</div>
+
+<style>
+    .splash-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        animation: fadeIn 0.5s ease-in;
+    }
+
+    .splash-content {
+        text-align: center;
+        animation: slideUp 0.8s ease-out;
+    }
+
+    .splash-title {
+        color: white;
+        font-size: 3rem;
+        font-weight: 300;
+        margin-bottom: 2rem;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        letter-spacing: 2px;
+    }
+
+    .loading-spinner {
+        width: 50px;
+        height: 50px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-top: 3px solid white;
+        border-radius: 50%;
+        margin: 0 auto;
+        animation: spin 1s linear infinite;
+    }
+
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    @@keyframes slideUp {
+        from {
+            transform: translateY(50px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    @@keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    @@media (max-width: 768px) {
+        .splash-title {
+            font-size: 2rem;
+            letter-spacing: 1px;
+        }
+    }
+</style>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        // Show splash screen for 2.5 seconds, then navigate to SD Card Prep
+        await Task.Delay(2500);
+        Navigation.NavigateTo("/sd-card-prep", true);
+    }
+}
