@@ -1,0 +1,44 @@
+name: Build macOS App
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Install .NET MAUI workload
+        run: dotnet workload install maui
+
+      - name: Restore dependencies
+        run: dotnet restore
+
+      - name: Build and publish for macOS
+        run: |
+          dotnet publish -f net9.0-maccatalyst -c Release \
+            -p:RuntimeIdentifiers="maccatalyst-x64;maccatalyst-arm64" \
+            -p:CreatePackage=true \
+            -p:CodesignKey="" \
+            -p:CodesignEntitlements="" \
+            -p:EnableCodeSigning=false \
+            -p:PublishTrimmed=false \
+            -o ./publish/macos
+
+      - name: Upload macOS build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextui-setup-wizard-macos
+          path: ./publish/macos/
+          retention-days: 30
