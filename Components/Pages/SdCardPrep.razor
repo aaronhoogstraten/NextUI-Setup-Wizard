@@ -767,12 +767,14 @@
             var drives = DriveInfo.GetDrives();
             DriveInfo? targetDrive = null;
 
-            // Find the drive that contains this path
+            // Find the drive that exactly matches this path's root
             foreach (var drive in drives)
             {
                 try
                 {
-                    if (path.StartsWith(drive.RootDirectory.FullName, StringComparison.OrdinalIgnoreCase))
+                    var rootPath = drive.RootDirectory.FullName;
+                    if (string.Equals(path, rootPath, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar, rootPath, StringComparison.OrdinalIgnoreCase))
                     {
                         targetDrive = drive;
                         break;
