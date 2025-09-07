@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="splash-active">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
@@ -9,13 +9,77 @@
     <link rel="stylesheet" href="css/app.css" />
     <link rel="stylesheet" href="NextUI Setup Wizard.styles.css" />
     <link rel="icon" href="data:,">
+    <style>
+        /* Remove default margin/padding and set background immediately */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Splash background - only active when splash-active class is present */
+        html.splash-active, body.splash-active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        /* Normal background when splash is not active */
+        html:not(.splash-active), body:not(.splash-active) {
+            background: white;
+        }
+
+        /* Immediate splash screen that shows before Blazor loads */
+        #app.splash-active {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* Normal app when splash is not active */
+        #app:not(.splash-active) {
+            position: relative;
+            background: transparent;
+        }
+
+        .splash-content {
+            text-align: center;
+        }
+
+        .splash-title {
+            color: white;
+            font-size: 3rem;
+            font-weight: 300;
+            margin-bottom: 2rem;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            letter-spacing: 2px;
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            .splash-title {
+                font-size: 2rem;
+                letter-spacing: 1px;
+            }
+        }
+    </style>
 </head>
 
-<body>
+<body class="splash-active">
 
     <div class="status-bar-safe-area"></div>
 
-    <div id="app">Loading...</div>
+    <div id="app" class="splash-active">
+        <div class="splash-content">
+            <h1 class="splash-title">NextUI Installation Tool</h1>
+        </div>
+    </div>
 
     <div id="blazor-error-ui">
         An unhandled error has occurred.

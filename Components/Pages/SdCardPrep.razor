@@ -693,11 +693,21 @@
     {
         if (firstRender)
         {
+            // Remove splash-active classes to revert to normal background
+            await JSRuntime.InvokeVoidAsync("eval", @"
+                document.documentElement.classList.remove('splash-active');
+                document.body.classList.remove('splash-active');
+                document.getElementById('app').classList.remove('splash-active');
+            ");
+
             // Wait 0.75s, then start fade transition
             await Task.Delay(1000);
             
             // Add fade-out class to trigger 0.75s transition
             await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('splashOverlay').classList.add('fade-out')");
+            
+            // Wait for fade transition to complete, then revert background to white
+            await Task.Delay(750);
         }
     }
 
