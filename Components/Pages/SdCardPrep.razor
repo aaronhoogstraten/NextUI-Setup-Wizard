@@ -9,7 +9,7 @@
 <!-- Splash overlay -->
 <div class="splash-overlay" id="splashOverlay">
     <div class="splash-content">
-        <h1 class="splash-title">NextUI Installation Tool</h1>
+        <h1 class="splash-title">NextUI Setup Wizard</h1>
     </div>
 </div>
 
@@ -254,7 +254,7 @@
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         z-index: 9999;
         opacity: 1;
-        transition: opacity 0.75s ease-out;
+        transition: opacity 1.5s ease-out;
     }
 
     .splash-overlay.fade-out {
@@ -700,14 +700,8 @@
                 document.getElementById('app').classList.remove('splash-active');
             ");
 
-            // Wait 0.75s, then start fade transition
-            await Task.Delay(1000);
-            
-            // Add fade-out class to trigger 0.75s transition
+            // Add fade-out class to trigger transition
             await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('splashOverlay').classList.add('fade-out')");
-            
-            // Wait for fade transition to complete, then revert background to white
-            await Task.Delay(750);
         }
     }
 
