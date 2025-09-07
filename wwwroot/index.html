@@ -10,22 +10,23 @@
     <link rel="stylesheet" href="NextUI Setup Wizard.styles.css" />
     <link rel="icon" href="data:,">
     <style>
-        /* Remove default margin/padding and set background immediately */
+        /* Remove default margin/padding */
         html, body {
             margin: 0;
             padding: 0;
             height: 100%;
+        }
+
+        /* Splash styles - only active when splash-active class is present */
+        html.splash-active, body.splash-active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             overflow: hidden;
         }
 
-        /* Splash background - only active when splash-active class is present */
-        html.splash-active, body.splash-active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-
-        /* Normal background when splash is not active */
+        /* Normal styles when splash is not active */
         html:not(.splash-active), body:not(.splash-active) {
             background: white;
+            overflow: auto;
         }
 
         /* Immediate splash screen that shows before Blazor loads */
