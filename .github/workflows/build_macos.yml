@@ -25,7 +25,7 @@ jobs:
         run: |
           dotnet publish "NextUI Setup Wizard.csproj" -f net9.0-maccatalyst -c Release \
             -p:RuntimeIdentifier=maccatalyst-x64 \
-            -p:CreatePackage=true \
+            -p:CreatePackage=false \
             -p:CodesignKey="" \
             -p:CodesignEntitlements="" \
             -p:EnableCodeSigning=false \
@@ -36,7 +36,7 @@ jobs:
         run: |
           dotnet publish "NextUI Setup Wizard.csproj" -f net9.0-maccatalyst -c Release \
             -p:RuntimeIdentifier=maccatalyst-arm64 \
-            -p:CreatePackage=true \
+            -p:CreatePackage=false \
             -p:CodesignKey="" \
             -p:CodesignEntitlements="" \
             -p:EnableCodeSigning=false \
