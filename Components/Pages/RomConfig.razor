@@ -779,14 +779,21 @@
                     var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
                     if (extension == ".zip")
                     {
-                        var zip = ZipFile.OpenRead(file.FullPath);
-                        if (system.SupportedFormats.Where(format => format != ".zip").Any(format => zip.Entries.Any(entry => entry.Name.ToLowerInvariant().EndsWith(format))))
+                        if (system.SupportedFormats.Count == 1 && system.SupportedFormats[0] == ".zip")
                         {
                             validFiles.Add(file);
                         }
                         else
                         {
-                            invalidFiles.Add(file.FileName);
+                            var zip = ZipFile.OpenRead(file.FullPath);
+                            if (system.SupportedFormats.Where(format => format != ".zip").Any(format => zip.Entries.Any(entry => entry.Name.ToLowerInvariant().EndsWith(format))))
+                            {
+                                validFiles.Add(file);
+                            }
+                            else
+                            {
+                                invalidFiles.Add(file.FileName);
+                            }
                         }
                     }
                     else
