@@ -1,6 +1,7 @@
 ﻿@page "/sd-card-prep"
 @using System.IO
 @using System.IO.Compression
+@using System.Runtime.InteropServices
 @using CommunityToolkit.Maui.Storage
 @using NextUI_Setup_Wizard.Resources
 @inject NavigationManager Navigation
@@ -40,57 +41,68 @@
                 </div>
 
                 <div class="platform-instructions">
-                    <div class="platform-section">
-                        <h5>🍎 macOS Users</h5>
-                        <div class="instruction-steps">
-                            <ol>
-                                <li>Open <strong>Disk Utility</strong> (Applications → Utilities → Disk Utility)</li>
-                                <li>Select your SD card from the sidebar</li>
-                                <li>Click <strong>Erase</strong></li>
-                                <li>Give it a name (e.g. NextUI)</li>
-                                <li>Choose format: <strong>MS-DOS (FAT)</strong> for FAT32 or <strong>ExFAT</strong></li>
-                                <li>Set Scheme to <strong>Master Boot Record</strong></li>
-                                <li>Click <strong>Erase</strong> to format</li>
-                            </ol>
+                    @if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        <div class="platform-section">
+                            <h5>🍎 macOS Instructions</h5>
+                            <div class="instruction-steps">
+                                <ol>
+                                    <li>Open <strong>Disk Utility</strong> (Applications → Utilities → Disk Utility)</li>
+                                    <li>Select your SD card from the sidebar</li>
+                                    <li>Click <strong>Erase</strong></li>
+                                    <li>Give it a name (e.g. NextUI)</li>
+                                    <li>Choose format: <strong>MS-DOS (FAT)</strong> for FAT32 or <strong>ExFAT</strong></li>
+                                    <li>Set Scheme to <strong>Master Boot Record</strong></li>
+                                    <li>Click <strong>Erase</strong> to format</li>
+                                </ol>
+                            </div>
                         </div>
-                    </div>
-
-                    <div class="platform-section">
-                        <h5>🪟 Windows Users</h5>
-                        <div class="instruction-steps">
-                            @* <p><strong>Option 1: Using Rufus (Recommended)</strong></p> *@
-                            <ol>
-                                <li>Download <a href="https://rufus.ie/" target="_blank">Rufus</a> (free tool)</li>
-                                <li>Run Rufus</li>
-                                <li>Select your SD card from the <span class="option">Device</span> dropdown</li>
-                                <li>Set <span class="option">Boot selection</span> to <strong>Non bootable</strong></li>
-                                <li>Set <span class="option"> Partition scheme</span> to <strong>MBR</strong></li>
-                                <li>Set <span class="option"> File system</span> to <strong>FAT32</strong> or <strong>exFAT</strong></li>
-                                <li>Under <span class="option"> Volume Label</span>, choose a name (e.g. NextUI) </li>
-                                <li>Make sure <span class="option"> Create extended label and icon files is</span> <strong>not</strong> selected</li>
-                                <li>Click <strong>START</strong> to format</li>
-                            </ol>
-
-                          @*   <p><strong>Option 2: Using File Explorer</strong></p>
-                            <ol>
-                                <li>Open File Explorer and locate your SD card</li>
-                                <li>Right-click the SD card and select <strong>Format...</strong></li>
-                                <li>Choose <strong>FAT32</strong> or <strong>exFAT</strong> as file system</li>
-                                <li>Click <strong>Start</strong> to format</li>
-                            </ol> *@
+                    }
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        <div class="platform-section">
+                            <h5>🪟 Windows Instructions</h5>
+                            <div class="instruction-steps">
+                                <ol>
+                                    <li>Download <a href="https://rufus.ie/" target="_blank">Rufus</a> (free tool)</li>
+                                    <li>Run Rufus</li>
+                                    <li>Select your SD card from the <span class="option">Device</span> dropdown</li>
+                                    <li>Set <span class="option">Boot selection</span> to <strong>Non bootable</strong></li>
+                                    <li>Set <span class="option"> Partition scheme</span> to <strong>MBR</strong></li>
+                                    <li>Set <span class="option"> File system</span> to <strong>FAT32</strong> or <strong>exFAT</strong></li>
+                                    <li>Under <span class="option"> Volume Label</span>, choose a name (e.g. NextUI) </li>
+                                    <li>Make sure <span class="option"> Create extended label and icon files is</span> <strong>not</strong> selected</li>
+                                    <li>Click <strong>START</strong> to format</li>
+                                </ol>
+                            </div>
                         </div>
-                    </div>
-@* 
-                    <div class="platform-section">
-                        <h5>🐧 Linux Users</h5>
-                        <div class="instruction-steps">
-                            <ol>
-                                <li>Use your distribution's disk management tool (e.g., GParted, Disks)</li>
-                                <li>Or use command line: <code>sudo mkfs.fat -F32 /dev/sdX1</code> (replace X with your device)</li>
-                                <li>For exFAT: <code>sudo mkfs.exfat /dev/sdX1</code></li>
-                            </ol>
+                    }
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                    {
+                        <div class="platform-section">
+                            <h5>🐧 Linux Instructions</h5>
+                            <div class="instruction-steps">
+                                <ol>
+                                    <li>Use your distribution's disk management tool (e.g., GParted, Disks)</li>
+                                    <li>Or use command line: <code>sudo mkfs.fat -F32 /dev/sdX1</code> (replace X with your device)</li>
+                                    <li>For exFAT: <code>sudo mkfs.exfat /dev/sdX1</code></li>
+                                </ol>
+                            </div>
                         </div>
-                    </div> *@
+                    }
+                    else
+                    {
+                        <div class="platform-section">
+                            <h5>⚠️ Unsupported Platform</h5>
+                            <div class="instruction-steps">
+                                <p>Your operating system is not currently supported. Please format your SD card using your system's disk management tools with the following requirements:</p>
+                                <ul>
+                                    <li>File system: FAT32 or exFAT</li>
+                                    <li>Partition scheme: Master Boot Record (MBR)</li>
+                                </ul>
+                            </div>
+                        </div>
+                    }
                 </div>
 
                 <div class="format-requirements">
