@@ -827,8 +827,37 @@
                 return;
             }
 
-            // Get file system information
-            fileSystem = targetDrive.DriveFormat.ToUpperInvariant();
+            // Get file system information using PartitionSchemeDetector for better cross-platform support
+            var partitionInfo = await PartitionSchemeDetector.DetectPartitionScheme(path);
+            
+            if (!string.IsNullOrEmpty(partitionInfo.ErrorMessage) || string.IsNullOrEmpty(partitionInfo.FileSystem))
+            {
+                // Fallback to DriveInfo if PartitionSchemeDetector fails
+                fileSystem = targetDrive.DriveFormat.ToUpperInvariant();
+            }
+            else
+            {
+                // Use PartitionSchemeDetector result and normalize the file system name
+                var detectedFS = partitionInfo.FileSystem.ToUpperInvariant();
+                
+                // Map macOS diskutil output to standard names
+                if (detectedFS.Contains("MS-DOS FAT32"))
+                {
+                    fileSystem = "FAT32";
+                }
+                else if (detectedFS.Contains("EXFAT"))
+                {
+                    fileSystem = "EXFAT";
+                }
+                else if (detectedFS.Contains("FAT"))
+                {
+                    fileSystem = "FAT32"; // Assume FAT32 for generic FAT
+                }
+                else
+                {
+                    fileSystem = detectedFS;
+                }
+            }
 
             // Validate file system
             if (fileSystem != "FAT32" && fileSystem != "EXFAT" && fileSystem != "FAT")
@@ -868,8 +897,6 @@
                 StateHasChanged();
                 return;
             }
-
-            var partitionInfo = await PartitionSchemeDetector.DetectPartitionScheme(path);
 
             if (!string.IsNullOrEmpty(partitionInfo.ErrorMessage))
             {
