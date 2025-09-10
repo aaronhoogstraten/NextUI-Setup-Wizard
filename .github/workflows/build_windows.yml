@@ -1,0 +1,65 @@
+name: Build Windows app
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+        
+    - name: Restore dependencies
+      run: dotnet restore
+      
+    - name: Publish NextUI Setup Wizard
+      run: |
+        Write-Host "Publishing NextUI Setup Wizard..."
+        dotnet publish -f net9.0-windows10.0.19041.0 -c Release -p:RuntimeIdentifierOverride=win10-x64 -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true
+        
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "Publish failed!"
+          exit $LASTEXITCODE
+        }
+        
+    - name: Create run script
+      run: |
+        Write-Host "Creating run script..."
+        $outputDir = "bin\Release\net9.0-windows10.0.19041.0"
+        $scriptPath = Join-Path $outputDir "Launch NextUI Setup Wizard.bat"
+        
+        $scriptContent = @"
+        @echo off
+        start "" "win10-x64\NextUI Setup Wizard.exe"
+        "@
+        
+        Set-Content -Path $scriptPath -Value $scriptContent
+        
+        Write-Host ""
+        Write-Host "Publish completed successfully!"
+        Write-Host "Run script created at: $scriptPath"
+        Write-Host ""
+        
+    - name: Create ZIP archive
+      run: |
+        Write-Host "Creating ZIP archive..."
+        $outputDir = "bin\Release\net9.0-windows10.0.19041.0"
+        $zipPath = "NextUI Setup Wizard.zip"
+        
+        Compress-Archive -Path "$outputDir\*" -DestinationPath $zipPath -Force
+        
+        Write-Host "ZIP archive created: $zipPath"
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: NextUI-Setup-Wizard
+        path: "NextUI Setup Wizard.zip"
+        retention-days: 30
