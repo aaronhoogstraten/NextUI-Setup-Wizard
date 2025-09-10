@@ -1,4 +1,4 @@
-name: Build Windows App
+name: Build Windows app
 
 on:
   workflow_dispatch:
@@ -47,19 +47,9 @@ jobs:
         Write-Host "Run script created at: $scriptPath"
         Write-Host ""
         
-    - name: Create ZIP archive
-      run: |
-        Write-Host "Creating ZIP archive..."
-        $outputDir = "bin\Release\net9.0-windows10.0.19041.0"
-        $zipPath = "NextUI Setup Wizard.zip"
-        
-        Compress-Archive -Path "$outputDir\*" -DestinationPath $zipPath -Force
-        
-        Write-Host "ZIP archive created: $zipPath"
-        
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: NextUI-Setup-Wizard
-        path: "NextUI Setup Wizard.zip"
+        name: NextUI-Setup-Wizard.zip
+        path: "bin/Release/net9.0-windows10.0.19041.0/*"
         retention-days: 30
