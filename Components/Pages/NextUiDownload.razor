@@ -739,7 +739,7 @@
             await JSRuntime.InvokeVoidAsync("eval", $"document.querySelector('[data-ref=\"progress-container\"]').scrollIntoView({{behavior: 'smooth', block: 'end'}});");
 
 
-            string extractPath = null;
+            string? extractPath = null;
 
             if (!string.IsNullOrEmpty(selectedPath))
             {
@@ -899,7 +899,7 @@
             downloadPercentage = 100;
             downloadProgress = "Complete!";
             downloadStatus = "Download, extraction and verification completed successfully";
-            downloadMessage = $"NextUI {latestRelease.TagName} has been successfully downloaded, extracted and verified to: {extractPath}";
+            downloadMessage = $"NextUI {latestRelease?.TagName ?? "release"} has been successfully downloaded, extracted and verified to: {extractPath}";
             downloadSuccess = true;
 
             StateHasChanged();

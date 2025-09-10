@@ -497,7 +497,7 @@
 
     private List<BiosSystem> biosSystems = new();
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
         // Get the extracted path from route parameter or query string
         if (!string.IsNullOrEmpty(ExtractedPath))
@@ -521,6 +521,7 @@
         }
 
         InitializeBiosSystems();
+        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -898,7 +899,7 @@
         }
     }
 
-    private async Task SkipBiosSetup()
+    private Task SkipBiosSetup()
     {
         statusMessage = "BIOS setup skipped. You can configure BIOS files later through the emulator settings.";
         isSuccess = true;
@@ -906,6 +907,7 @@
 
         // In a real app, you'd navigate to the next page or complete the setup
         Navigation.NavigateTo($"/rom-config/{Uri.EscapeDataString(extractedPath)}"); // Example navigation
+        return Task.CompletedTask;
     }
 
     // Method to set the extracted path (call this when navigating from the release page)

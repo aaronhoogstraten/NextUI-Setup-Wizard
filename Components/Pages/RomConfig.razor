@@ -648,7 +648,7 @@
 
     private List<RomSystem> romSystems = new();
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
         // Get the extracted path from route parameter or query string
         if (!string.IsNullOrEmpty(ExtractedPath))
@@ -672,6 +672,7 @@
         }
 
         InitializeRomSystems();
+        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -950,13 +951,14 @@
         }
     }
 
-    private async Task SkipRomSetup()
+    private Task SkipRomSetup()
     {
         statusMessage = "ROM setup skipped. You can add ROM files later by copying them to the appropriate system directories.";
         isSuccess = true;
         StateHasChanged();
 
         Navigation.NavigateTo("/setup-complete");
+        return Task.CompletedTask;
     }
 
     private void ToggleSnesSystemCode(RomSystem system)

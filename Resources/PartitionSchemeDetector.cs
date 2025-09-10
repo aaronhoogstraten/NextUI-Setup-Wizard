@@ -399,6 +399,9 @@ namespace NextUI_Setup_Wizard.Resources
 
         private static async Task<string> RunCommand(string command, string arguments)
         {
+#if IOS
+            return "Command execution not supported on iOS";
+#else
             try
             {
                 var startInfo = new ProcessStartInfo
@@ -427,6 +430,7 @@ namespace NextUI_Setup_Wizard.Resources
             }
 
             return "";
+#endif
         }
 
         private static async Task<string> RunPowerShell(string script)
