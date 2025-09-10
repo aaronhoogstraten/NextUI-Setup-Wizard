@@ -860,6 +860,31 @@
 
             // Extract zip file directly to the specified directory
             ZipFile.ExtractToDirectory(tempFilePath, extractPath, true);
+            
+            // Verify extraction
+            downloadProgress = "Verifying...";
+            downloadStatus = "Verifying extraction...";
+            downloadPercentage = 85;
+            StateHasChanged();
+            await Task.Delay(500);
+            
+            var extractionValid = VerifyExtraction(tempFilePath, extractPath);
+            if (!extractionValid)
+            {
+                // Cleanup on failed verification
+                File.Delete(tempFilePath);
+                try
+                {
+                    Directory.Delete(extractPath, true);
+                }
+                catch { /* Ignore cleanup errors */ }
+                
+                isDownloading = false;
+                downloadMessage = "Extraction verification failed! The extracted files do not match the zip contents.";
+                downloadSuccess = false;
+                StateHasChanged();
+                return;
+            }
         
             // Cleanup temp file
             File.Delete(tempFilePath);
@@ -867,8 +892,8 @@
             // Success
             downloadPercentage = 100;
             downloadProgress = "Complete!";
-            downloadStatus = "Download and extraction completed successfully";
-            downloadMessage = $"NextUI {latestRelease.TagName} has been successfully downloaded and extracted to: {extractPath}";
+            downloadStatus = "Download, extraction and verification completed successfully";
+            downloadMessage = $"NextUI {latestRelease.TagName} has been successfully downloaded, extracted and verified to: {extractPath}";
             downloadSuccess = true;
 
             StateHasChanged();
@@ -956,6 +981,79 @@
         catch (Exception)
         {
             // If we can't read the directory, assume it's not empty for safety
+            return false;
+        }
+    }
+    
+    private List<string> GetRootZipEntries(string zipFilePath)
+    {
+        var rootEntries = new List<string>();
+        
+        try
+        {
+            using var archive = ZipFile.OpenRead(zipFilePath);
+            foreach (var entry in archive.Entries)
+            {
+                // Handle both files and directories (including empty directories)
+                var entryPath = entry.FullName.Replace('\\', '/');
+                if (!string.IsNullOrEmpty(entryPath))
+                {
+                    // Get the top-level directory or file name
+                    var rootPart = entryPath.Split('/')[0];
+                    
+                    if (!string.IsNullOrEmpty(rootPart) && !rootEntries.Contains(rootPart, StringComparer.OrdinalIgnoreCase))
+                    {
+                        rootEntries.Add(rootPart);
+                    }
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Return empty list if zip cannot be read
+            return new List<string>();
+        }
+        
+        return rootEntries;
+    }
+    
+    private bool VerifyExtraction(string zipFilePath, string extractPath)
+    {
+        try
+        {
+            var zipRootEntries = GetRootZipEntries(zipFilePath);
+            if (!zipRootEntries.Any())
+            {
+                return false; // Cannot verify if zip has no readable entries
+            }
+            
+            var extractedEntries = Directory.GetFileSystemEntries(extractPath)
+                .Select(Path.GetFileName)
+                .Where(name => !string.IsNullOrEmpty(name) && !FileSystemHelper.IsSystemFile(name))
+                .ToList();
+            
+            // Check that all zip root entries exist in extracted directory
+            foreach (var zipEntry in zipRootEntries)
+            {
+                if (!extractedEntries.Contains(zipEntry, StringComparer.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+            
+            // Check that no unexpected files were extracted (only root level)
+            foreach (var extractedEntry in extractedEntries)
+            {
+                if (!zipRootEntries.Contains(extractedEntry, StringComparer.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+        catch (Exception)
+        {
             return false;
         }
     }
