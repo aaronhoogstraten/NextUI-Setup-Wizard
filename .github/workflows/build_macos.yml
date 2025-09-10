@@ -46,13 +46,13 @@ jobs:
       - name: Upload macOS x64 build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: NextUI-Setup-Wizard_x64.zip
+          name: NextUI-Setup-Wizard_x64
           path: ./publish/macos-x64/
           retention-days: 30
 
       - name: Upload macOS ARM64 build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: NextUI-Setup-Wizard_arm64.zip
+          name: NextUI-Setup-Wizard_arm64
           path: ./publish/macos-arm64/
           retention-days: 30
