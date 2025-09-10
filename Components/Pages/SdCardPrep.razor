@@ -71,7 +71,6 @@
                                     <li>Set <span class="option"> Partition scheme</span> to <strong>MBR</strong></li>
                                     <li>Set <span class="option"> File system</span> to <strong>FAT32</strong> or <strong>exFAT</strong></li>
                                     <li>Under <span class="option"> Volume Label</span>, choose a name (e.g. NextUI) </li>
-                                    <li>Make sure <span class="option"> Create extended label and icon files is</span> <strong>not</strong> selected</li>
                                     <li>Click <strong>START</strong> to format</li>
                                 </ol>
                             </div>
@@ -996,7 +995,7 @@
                 .ToList();
 
             var rootEntries = Directory.GetFileSystemEntries(path)
-                .Where(entry => !IsSystemFile(Path.GetFileName(entry)))
+                .Where(entry => !FileSystemHelper.IsSystemFile(Path.GetFileName(entry)))
                 .ToList();
 
             wipeProgress = $"Found {allEntries.Count} items to delete...";
@@ -1074,7 +1073,7 @@
 
             // Verify the SD card is now empty (except system files)
             var remainingEntries = Directory.GetFileSystemEntries(path)
-                .Where(entry => !IsSystemFile(Path.GetFileName(entry)))
+                .Where(entry => !FileSystemHelper.IsSystemFile(Path.GetFileName(entry)))
                 .ToList();
 
             if (remainingEntries.Any())
@@ -1124,7 +1123,7 @@
             var filteredEntries = entries.Where(entry =>
             {
                 var fileName = Path.GetFileName(entry);
-                return !IsSystemFile(fileName);
+                return !FileSystemHelper.IsSystemFile(fileName);
             });
             
             return !filteredEntries.Any();
@@ -1136,25 +1135,6 @@
         }
     }
     
-    private bool IsSystemFile(string fileName)
-    {
-        if (string.IsNullOrEmpty(fileName))
-            return false;
-            
-        // Common system files to ignore
-        var systemFiles = new[]
-        {
-            "System Volume Information",    // Windows
-            "WPSettings.dat",   // Windows
-            ".DS_Store",      // macOS
-            "Thumbs.db",      // Windows
-            "desktop.ini",    // Windows
-            "._.DS_Store",    // macOS resource fork
-            "__MACOSX"        // macOS archive metadata
-        };
-        
-        return systemFiles.Any(sf => fileName.Equals(sf, StringComparison.OrdinalIgnoreCase));
-    }
     
     private async Task<bool> IsNextUIInstalled(string path)
     {

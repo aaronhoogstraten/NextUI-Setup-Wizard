@@ -5,6 +5,7 @@
 @using System.IO.Compression
 @using System.Security.Cryptography
 @using CommunityToolkit.Maui.Storage
+@using NextUI_Setup_Wizard.Resources
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
@@ -947,7 +948,7 @@
             var filteredEntries = entries.Where(entry =>
             {
                 var fileName = Path.GetFileName(entry);
-                return !IsSystemFile(fileName);
+                return !FileSystemHelper.IsSystemFile(fileName);
             });
             
             return !filteredEntries.Any();
@@ -959,25 +960,6 @@
         }
     }
     
-    private bool IsSystemFile(string fileName)
-    {
-        if (string.IsNullOrEmpty(fileName))
-            return false;
-            
-        // Common system files to ignore
-        var systemFiles = new[]
-        {
-            "System Volume Information",    // Windows
-            "WPSettings.dat",   // Windows
-            ".DS_Store",      // macOS
-            "Thumbs.db",      // Windows
-            "desktop.ini",    // Windows
-            "._.DS_Store",    // macOS resource fork
-            "__MACOSX"        // macOS archive metadata
-        };
-        
-        return systemFiles.Any(sf => fileName.Equals(sf, StringComparison.OrdinalIgnoreCase));
-    }
     
     private string FormatReleaseNotes(string body)
     {
