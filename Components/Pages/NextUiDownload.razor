@@ -38,7 +38,10 @@
         <div class="release-info">
             <div class="release-header">
                 <h4>@latestRelease.Name</h4>
-                <span class="tag-name">@latestRelease.TagName</span>
+                @if (!string.IsNullOrEmpty(latestRelease.TagName) && !latestRelease.TagName.Equals(latestRelease.Name, StringComparison.OrdinalIgnoreCase))
+                {
+                    <span class="tag-name">Tag: @latestRelease.TagName</span>
+                }
                 @if (latestRelease.IsPrerelease)
                 {
                     <span class="prerelease-badge">Pre-release</span>
@@ -46,7 +49,10 @@
             </div>
             
             <div class="release-meta">
-                <p><strong>Author:</strong> @latestRelease.Author</p>
+                @if (!string.IsNullOrEmpty(latestRelease.Author))
+                {
+                    <p><strong>Author:</strong> @latestRelease.Author</p>
+                }
                 <p><strong>Published:</strong> @latestRelease.PublishedDate</p>
             </div>
             
