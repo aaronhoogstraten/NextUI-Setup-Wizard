@@ -9,7 +9,7 @@
 @inject HttpClient Http
 
 <div class="bios-container">
-    <h3>BIOS Configuration</h3>
+    <h3 data-ref="page-header">BIOS Configuration</h3>
     <p class="intro-text">Please select the BIOS files for each gaming system. These files are required for proper emulation.</p>
 
     @if (!string.IsNullOrEmpty(extractedPath))
@@ -124,7 +124,7 @@
 
     @if (isCopying)
     {
-        <div class="copy-progress">
+        <div data-ref="progress-container" class="copy-progress">
             <div class="progress-bar">
                 <div class="progress-fill" style="width: @(copyPercentage)%"></div>
             </div>
@@ -523,6 +523,16 @@
         InitializeBiosSystems();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Scroll to page header when page first loads
+            await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"page-header\"]').scrollIntoView({behavior: 'auto', block: 'start'});");
+        }
+    }
+
+
     private void InitializeBiosSystems()
     {
         var biosRootPath = Path.Combine(extractedPath, "Bios");
@@ -804,6 +814,10 @@
             copyProgress = "Copying...";
             copyStatus = "Preparing to copy files...";
             StateHasChanged();
+            
+            // Auto-scroll to progress bar
+            await Task.Delay(50); // Allow DOM to render
+            await JSRuntime.InvokeVoidAsync("eval", $"document.querySelector('[data-ref=\"progress-container\"]').scrollIntoView({{behavior: 'smooth', block: 'end'}});");
 
             for (int i = 0; i < selectedFiles.Count; i++)
             {

@@ -15,7 +15,7 @@
 </div>
 
 <div class="sd-card-container">
-    <h3>SD Card Preparation</h3>
+    <h3 data-ref="page-header">SD Card Preparation</h3>
 
     @if (currentStep == Step.Instructions)
     {
@@ -165,7 +165,7 @@
                     
                     @if (isWiping)
                     {
-                        <div class="wipe-progress">
+                        <div data-ref="progress-container" class="wipe-progress">
                             <div class="progress-bar">
                                 <div class="progress-fill" style="width: @(wipePercentage)%"></div>
                             </div>
@@ -714,6 +714,9 @@
 
             // Add fade-out class to trigger transition
             await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('splashOverlay').classList.add('fade-out')");
+            
+            // Scroll to page header when page first loads
+            await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"page-header\"]').scrollIntoView({behavior: 'auto', block: 'start'});");
         }
     }
 
@@ -958,6 +961,10 @@
             wipeProgress = "Preparing to wipe SD card...";
             wipePercentage = 0;
             StateHasChanged();
+            
+            // Auto-scroll to progress bar
+            await Task.Delay(50); // Allow DOM to render
+            await JSRuntime.InvokeVoidAsync("eval", $"document.querySelector('[data-ref=\"progress-container\"]').scrollIntoView({{behavior: 'smooth', block: 'end'}});");
 
             await WipeSDCard(selectedPath);
 

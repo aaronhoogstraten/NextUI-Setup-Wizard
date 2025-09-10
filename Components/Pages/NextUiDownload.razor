@@ -7,9 +7,10 @@
 @using CommunityToolkit.Maui.Storage
 @inject HttpClient Http
 @inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
 
 <div class="release-container">
-    <h3>Latest NextUI Release</h3>
+    <h3 data-ref="page-header">Latest NextUI Release</h3>
 
     @if (!string.IsNullOrEmpty(SelectedPath))
     {
@@ -123,7 +124,7 @@
             
             @if (isDownloading)
             {
-                <div class="download-progress">
+                <div data-ref="progress-container" class="download-progress">
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: @(downloadPercentage)%"></div>
                     </div>
@@ -466,6 +467,16 @@
         await LoadReleaseInfo();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Scroll to page header when page first loads
+            await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"page-header\"]').scrollIntoView({behavior: 'auto', block: 'start'});");
+        }
+    }
+
+
     private async Task LoadReleaseInfo()
     {
         isLoading = true;
@@ -715,6 +726,10 @@
             downloadProgress = "Preparing...";
             downloadStatus = "Selecting download directory...";
             StateHasChanged();
+            
+            // Auto-scroll to progress bar
+            await Task.Delay(50); // Allow DOM to render
+            await JSRuntime.InvokeVoidAsync("eval", $"document.querySelector('[data-ref=\"progress-container\"]').scrollIntoView({{behavior: 'smooth', block: 'end'}});");
 
 
             string extractPath = null;

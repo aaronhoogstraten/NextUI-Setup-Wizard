@@ -3,7 +3,7 @@
 @inject NavigationManager Navigation
 
 <div class="completion-container">
-    <div class="completion-card">
+    <div class="completion-card" data-ref="page-header">
         <div class="success-header">
             <div class="success-icon">✓</div>
             <h2>Setup Complete!</h2>
@@ -333,6 +333,15 @@
 </style>
 
 @code {
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Scroll to page header when page first loads
+            await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"page-header\"]').scrollIntoView({behavior: 'auto', block: 'start'});");
+        }
+    }
+
     private async Task FinishSetup()
     {
         try
