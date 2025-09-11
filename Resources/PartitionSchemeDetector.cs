@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -250,39 +251,116 @@ namespace NextUI_Setup_Wizard.Resources
             }
         }
 
-        private static async Task<PartitionInfo> TryDiskutil(string volumePath)
+        private static async Task<PartitionInfo> TryDiskutil(string volumePath, string? testVolumeInfo = null, string? testDiskInfo = null)
         {
             var info = new PartitionInfo();
 
             try
             {
-                // Get volume info
-                var volumeInfo = await RunCommand("/usr/sbin/diskutil", $"info \"{volumePath}\"");
+                // Get volume info using diskutil info (equivalent to diskutil info "$VOLUME")
+                var volumeInfo = testVolumeInfo ?? await RunCommand("/usr/sbin/diskutil", $"info \"{volumePath}\"");
                 if (!string.IsNullOrEmpty(volumeInfo))
                 {
+                    // Parse volume info and extract disk identifier
                     ParseDiskutilVolumeInfo(volumeInfo, info);
-                }
-
-                // Get parent disk info for partition scheme
-                if (!string.IsNullOrEmpty(info.Details))
-                {
-                    var bsdNameMatch = Regex.Match(info.Details, @"Device Identifier:\s*(\w+)");
-                    if (bsdNameMatch.Success)
+                    
+                    // Extract disk part (e.g., disk2s1) from "Part of Whole" field
+                    var diskPartMatch = Regex.Match(volumeInfo, @"Part of Whole:\s*(\w+)");
+                    if (diskPartMatch.Success)
                     {
-                        var bsdName = bsdNameMatch.Groups[1].Value;
-                        var diskName = Regex.Replace(bsdName, @"s\d+$", ""); // Remove partition number
-
-                        var diskInfo = await RunCommand("/usr/sbin/diskutil", $"info {diskName}");
-                        if (!string.IsNullOrEmpty(diskInfo))
+                        var diskPart = diskPartMatch.Groups[1].Value; // e.g., disk2s1
+                        
+                        // Extract just the disk number (e.g., disk2 from disk2s1)
+                        var diskMatch = Regex.Match(diskPart, @"^(disk\d+)");
+                        if (diskMatch.Success)
                         {
-                            ParseDiskutilDiskInfo(diskInfo, info);
+                            var disk = diskMatch.Groups[1].Value; // e.g., disk2
+                            
+                            // Get partition type - look for "Type (Bundle)" first, then "File System Personality"
+                            var partitionType = "";
+                            var typeBundleMatch = Regex.Match(volumeInfo, @"Type \(Bundle\):\s*(.+)");
+                            if (typeBundleMatch.Success)
+                            {
+                                partitionType = typeBundleMatch.Groups[1].Value.Trim();
+                            }
+                            else
+                            {
+                                var fsPersonalityMatch = Regex.Match(volumeInfo, @"File System Personality:\s*(.+)");
+                                if (fsPersonalityMatch.Success)
+                                {
+                                    partitionType = fsPersonalityMatch.Groups[1].Value.Trim();
+                                }
+                            }
+                            
+                            // Validate partition type (FAT32 = "msdos" or contains "fat32", exFAT = "exfat" or contains "exfat")
+                            var isFAT32 = partitionType.Equals("msdos", StringComparison.OrdinalIgnoreCase) || 
+                                         partitionType.Contains("fat32", StringComparison.OrdinalIgnoreCase);
+                            var isExFAT = partitionType.Contains("exfat", StringComparison.OrdinalIgnoreCase);
+                            var isValidFileSystem = isFAT32 || isExFAT;
+                            
+                            if (isValidFileSystem)
+                            {
+                                info.FileSystem = isFAT32 ? "FAT32" : "exFAT";
+                            }
+                            
+                            // Get partition scheme from the whole disk (equivalent to diskutil info "/dev/$DISK")
+                            var diskInfo = testDiskInfo ?? await RunCommand("/usr/sbin/diskutil", $"info /dev/{disk}");
+                            if (!string.IsNullOrEmpty(diskInfo))
+                            {
+                                // Look for "Content (IOContent)" field for partition scheme
+                                var schemeMatch = Regex.Match(diskInfo, @"Content \(IOContent\):\s*(.+)");
+                                if (schemeMatch.Success)
+                                {
+                                    var scheme = schemeMatch.Groups[1].Value.Trim();
+                                    
+                                    // Validate scheme (MBR = "FDisk_partition_scheme")
+                                    if (scheme.Equals("FDisk_partition_scheme", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        info.Scheme = PartitionScheme.MBR;
+                                    }
+                                    else if (scheme.Contains("GUID_partition_scheme"))
+                                    {
+                                        info.Scheme = PartitionScheme.GPT;
+                                    }
+                                    else if (scheme.Contains("Apple_partition_scheme"))
+                                    {
+                                        info.Scheme = PartitionScheme.APM;
+                                    }
+                                }
+                                
+                                // Extract model information
+                                var modelMatch = Regex.Match(diskInfo, @"Device / Media Name:\s*(.+)");
+                                if (modelMatch.Success)
+                                {
+                                    info.Model = modelMatch.Groups[1].Value.Trim();
+                                }
+                            }
+                            
+                            // Set validation result based on both file system and partition scheme
+                            info.Details = $"Disk: {disk}, Partition Type: {partitionType}, Scheme: {info.Scheme}";
+                            
+                            // Mark as valid if both file system and scheme are correct
+                            if (isValidFileSystem && info.Scheme == PartitionScheme.MBR)
+                            {
+                                info.Details += " [VALID: SD card is properly formatted]";
+                            }
+                            else
+                            {
+                                var issues = new List<string>();
+                                if (!isValidFileSystem)
+                                    issues.Add($"Invalid file system: {partitionType} (expected: msdos for FAT32 or exfat for exFAT)");
+                                if (info.Scheme != PartitionScheme.MBR)
+                                    issues.Add($"Invalid partition scheme: {info.Scheme} (expected: MBR/FDisk_partition_scheme)");
+                                
+                                info.ErrorMessage = $"SD card validation failed: {string.Join(", ", issues)}";
+                            }
                         }
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore errors, try alternative method
+                info.ErrorMessage = $"diskutil command failed: {ex.Message}";
             }
 
             return info;
@@ -645,6 +723,75 @@ namespace NextUI_Setup_Wizard.Resources
                         };
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Test method using real-world diskutil output data
+        /// </summary>
+        public static async Task TestRealWorldDiskutilAsync()
+        {
+            Console.WriteLine("Testing real-world diskutil output parsing...");
+
+            var testVolumeInfo = @"      Device Identifier:         disk6s1
+   Device Node:               /dev/disk6s1
+   Whole:                     No
+   Part of Whole:             disk6
+
+   Volume Name:               SETUPWIZ
+   Mounted:                   Yes
+   Mount Point:               /Volumes/SETUPWIZ
+
+   Partition Type:            Windows_NTFS
+   File System Personality:   ExFAT
+   Type (Bundle):             exfat
+   Name (User Visible):       ExFAT
+
+   OS Can Be Installed:       No
+   Media Type:                Generic
+   Protocol:                  USB
+   SMART Status:              Not Supported
+   Volume UUID:               E3E8A367-42AD-3283-A77E-5CF409ED1742
+   Partition Offset:          1048576 Bytes (2048 512-Byte-Device-Blocks)
+
+   Disk Size:                 62.5 GB (62533926912 Bytes) (exactly 122136576 512-Byte-Units)
+   Device Block Size:         512 Bytes
+
+   Volume Total Space:        62.5 GB (62530912256 Bytes) (exactly 122130688 512-Byte-Units)
+   Volume Used Space:         13.2 MB (13238272 Bytes) (exactly 25856 512-Byte-Units) (0.0%)
+   Volume Free Space:         62.5 GB (62517673984 Bytes) (exactly 122104832 512-Byte-Units) (100.0%)
+   Allocation Block Size:     512 Bytes
+
+   Media OS Use Only:         No
+   Media Read-Only:           No
+   Volume Read-Only:          No
+
+   Device Location:           External
+   Removable Media:           Removable
+   Media Removal:             Software-Activated
+
+   Solid State:               Info not available";
+
+            var testDiskInfo = @"Content (IOContent): FDisk_partition_scheme";
+
+            var result = await TryDiskutil("/Volumes/SETUPWIZ", testVolumeInfo, testDiskInfo);
+
+            Console.WriteLine($"Result:");
+            Console.WriteLine($"  File System: {result.FileSystem}");
+            Console.WriteLine($"  Scheme: {result.Scheme}");
+            Console.WriteLine($"  Error: {result.ErrorMessage}");
+            Console.WriteLine($"  Details: {result.Details}");
+
+            var isValid = result.FileSystem == "exFAT" && result.Scheme == PartitionScheme.MBR && string.IsNullOrEmpty(result.ErrorMessage);
+            Console.WriteLine($"  Valid SD Card: {isValid}");
+
+            if (isValid)
+            {
+                Console.WriteLine("  ✅ Test PASSED - SD card is properly formatted (exFAT + MBR)");
+            }
+            else
+            {
+                Console.WriteLine("  ❌ Test FAILED");
             }
         }
     }

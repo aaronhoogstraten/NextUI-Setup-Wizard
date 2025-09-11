@@ -841,17 +841,13 @@
                 var detectedFS = partitionInfo.FileSystem.ToUpperInvariant();
                 
                 // Map macOS diskutil output to standard names
-                if (detectedFS.Contains("MS-DOS FAT32"))
+                if (detectedFS.Contains("FAT32"))
                 {
                     fileSystem = "FAT32";
                 }
                 else if (detectedFS.Contains("EXFAT"))
                 {
                     fileSystem = "EXFAT";
-                }
-                else if (detectedFS.Contains("FAT"))
-                {
-                    fileSystem = "FAT32"; // Assume FAT32 for generic FAT
                 }
                 else
                 {
@@ -860,7 +856,7 @@
             }
 
             // Validate file system
-            if (fileSystem != "FAT32" && fileSystem != "EXFAT" && fileSystem != "FAT")
+            if (fileSystem != "FAT32" && fileSystem != "EXFAT")
             {
                 validationError = $"Invalid file system detected: {fileSystem}. Please format your SD card to FAT32 or exFAT and try again.";
                 isValidating = false;
