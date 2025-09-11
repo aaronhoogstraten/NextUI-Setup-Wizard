@@ -1,10 +1,19 @@
-﻿namespace NextUI_Setup_Wizard
+﻿using NextUI_Setup_Wizard.Resources;
+
+namespace NextUI_Setup_Wizard
 {
     public partial class App : Application
     {
         public App()
         {
             InitializeComponent();
+            
+            // Rotate log files on startup
+            Logger.RotateLogFiles();
+            
+            // Log application startup
+            using var logger = new Logger();
+            logger.Log("NextUI Setup Wizard started.");
         }
 
         protected override Window CreateWindow(IActivationState? activationState)
