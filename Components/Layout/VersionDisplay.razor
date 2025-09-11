@@ -1,0 +1,28 @@
+@using NextUI_Setup_Wizard.Resources
+
+<div class="version-display">
+    @VersionInfo.VersionString
+</div>
+
+<style>
+    .version-display {
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+        font-family: 'Courier New', Consolas, monospace;
+        font-size: 12px;
+        color: #666;
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 1px solid #ddd;
+        z-index: 1000;
+        user-select: none;
+        backdrop-filter: blur(2px);
+    }
+    
+    .version-display:hover {
+        color: #333;
+        background-color: rgba(255, 255, 255, 0.95);
+    }
+</style>

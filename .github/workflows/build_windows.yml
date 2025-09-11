@@ -16,13 +16,20 @@ jobs:
       with:
         dotnet-version: '9.0.x'
         
+    - name: Get commit hash
+      id: commit
+      run: |
+        $commitHash = git rev-parse --short HEAD
+        Write-Host "Commit hash: $commitHash"
+        echo "hash=$commitHash" >> $env:GITHUB_OUTPUT
+      
     - name: Restore dependencies
       run: dotnet restore
       
     - name: Publish NextUI Setup Wizard
       run: |
-        Write-Host "Publishing NextUI Setup Wizard..."
-        dotnet publish -f net9.0-windows10.0.19041.0 -c Release -p:RuntimeIdentifierOverride=win10-x64 -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true
+        Write-Host "Publishing NextUI Setup Wizard with commit hash: ${{ steps.commit.outputs.hash }}"
+        dotnet publish -f net9.0-windows10.0.19041.0 -c Release -p:RuntimeIdentifierOverride=win10-x64 -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true -p:CommitHash="${{ steps.commit.outputs.hash }}"
         
         if ($LASTEXITCODE -ne 0) {
           Write-Host "Publish failed!"

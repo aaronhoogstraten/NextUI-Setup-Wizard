@@ -36,7 +36,14 @@
         <MtouchLink Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">None</MtouchLink>
         <UseInterpreter Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">false</UseInterpreter>
         <RuntimeIdentifier Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'maccatalyst'">maccatalyst-arm64</RuntimeIdentifier>
+        
+        <!-- Commit hash injection -->
+        <CommitHash Condition="'$(CommitHash)' == ''">dev</CommitHash>
     </PropertyGroup>
+
+    <ItemGroup>
+        <AssemblyMetadata Include="CommitHash" Value="$(CommitHash)" />
+    </ItemGroup>
 
     <ItemGroup>
         <!-- App Icon -->
