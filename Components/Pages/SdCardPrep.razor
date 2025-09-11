@@ -713,7 +713,7 @@
 
             // Add fade-out class to trigger transition
             await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('splashOverlay').classList.add('fade-out')");
-            
+
             // Scroll to page header when page first loads
             await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"page-header\"]').scrollIntoView({behavior: 'auto', block: 'start'});");
         }
@@ -829,17 +829,20 @@
 
             // Get file system information using PartitionSchemeDetector for better cross-platform support
             var partitionInfo = await PartitionSchemeDetector.DetectPartitionScheme(path);
-            
+
+            using var logger = new Logger();
+
             if (!string.IsNullOrEmpty(partitionInfo.ErrorMessage) || string.IsNullOrEmpty(partitionInfo.FileSystem))
             {
                 // Fallback to DriveInfo if PartitionSchemeDetector fails
                 fileSystem = targetDrive.DriveFormat.ToUpperInvariant();
+                logger.Log($"Fallback to DriveInfo from PartitionSchemeDetector failure, fileSystem: {fileSystem}");
             }
             else
             {
                 // Use PartitionSchemeDetector result and normalize the file system name
                 var detectedFS = partitionInfo.FileSystem.ToUpperInvariant();
-                
+
                 // Map macOS diskutil output to standard names
                 if (detectedFS.Contains("FAT32"))
                 {
