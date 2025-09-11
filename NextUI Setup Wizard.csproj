@@ -17,7 +17,7 @@
         <ApplicationTitle>NextUI Setup Wizard</ApplicationTitle>
 
         <!-- App Identifier -->
-        <ApplicationId>com.companyname.nextuisetupwizard</ApplicationId>
+        <ApplicationId>com.nextuisetupwizard</ApplicationId>
 
         <!-- Versions -->
         <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
