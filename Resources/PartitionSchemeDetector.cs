@@ -11,6 +11,20 @@ namespace NextUI_Setup_Wizard.Resources
 {
     public static class PartitionSchemeDetector
     {
+        public static string CurrentOS
+        {
+            get
+            {
+#if WINDOWS
+                return "WINDOWS";
+#elif MACCATALYST
+                return "MAC";
+#else
+                return "UNSUPPORTED";
+#endif
+            }
+        }
+
         public enum PartitionScheme
         {
             Unknown,

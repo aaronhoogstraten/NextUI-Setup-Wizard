@@ -41,7 +41,7 @@
                 </div>
 
                 <div class="platform-instructions">
-                    @if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    @if (PartitionSchemeDetector.CurrentOS == "MAC")
                     {
                         <div class="platform-section">
                             <h5>🍎 macOS Instructions</h5>
@@ -58,7 +58,7 @@
                             </div>
                         </div>
                     }
-                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    else if (PartitionSchemeDetector.CurrentOS == "WINDOWS")
                     {
                         <div class="platform-section">
                             <h5>🪟 Windows Instructions</h5>
@@ -72,19 +72,6 @@
                                     <li>Set <span class="option"> File system</span> to <strong>FAT32</strong> or <strong>exFAT</strong></li>
                                     <li>Under <span class="option"> Volume Label</span>, choose a name (e.g. NextUI) </li>
                                     <li>Click <strong>START</strong> to format</li>
-                                </ol>
-                            </div>
-                        </div>
-                    }
-                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                    {
-                        <div class="platform-section">
-                            <h5>🐧 Linux Instructions</h5>
-                            <div class="instruction-steps">
-                                <ol>
-                                    <li>Use your distribution's disk management tool (e.g., GParted, Disks)</li>
-                                    <li>Or use command line: <code>sudo mkfs.fat -F32 /dev/sdX1</code> (replace X with your device)</li>
-                                    <li>For exFAT: <code>sudo mkfs.exfat /dev/sdX1</code></li>
                                 </ol>
                             </div>
                         </div>
