@@ -9,8 +9,15 @@ namespace NextUI_Setup_Wizard.Resources
     {
         private const string LogFileName = "NextUI-Setup-Wizard.log";
         private const string PrevLogFileName = "NextUI-Setup-Wizard_previous.log";
+        private static readonly string LogPath = Path.Combine(FileSystem.CacheDirectory, LogFileName);
+
         private readonly StringBuilder _messages = new();
-        
+
+        public static void LogImmediate(string message)
+        {
+            File.AppendAllText(LogPath, message);
+        }
+
         public void Log(string message)
         {
             var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
@@ -23,8 +30,7 @@ namespace NextUI_Setup_Wizard.Resources
             {
                 if (_messages.Length > 0)
                 {
-                    var logPath = Path.Combine(FileSystem.Current.CacheDirectory, LogFileName);
-                    File.AppendAllText(logPath, _messages.ToString());
+                    File.AppendAllText(LogPath, _messages.ToString());
                 }
             }
             catch (Exception)
@@ -39,7 +45,7 @@ namespace NextUI_Setup_Wizard.Resources
         {
             try
             {
-                var cacheDirectory = FileSystem.Current.CacheDirectory;
+                var cacheDirectory = FileSystem.CacheDirectory;
                 var currentLogPath = Path.Combine(cacheDirectory, LogFileName);
                 var prevLogPath = Path.Combine(cacheDirectory, PrevLogFileName);
 

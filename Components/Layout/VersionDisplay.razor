@@ -1,7 +1,7 @@
 @using NextUI_Setup_Wizard.Resources
 
 <div class="version-container">
-    <button class="log-button" @onclick="OpenLogDirectory">log</button>
+    <button class="log-button" @onclick="OpenLogDirectory" title="@FileSystem.CacheDirectory">log</button>
     <div class="version-display">
         @VersionInfo.VersionString
     </div>
@@ -10,9 +10,19 @@
 @code {
     private async Task OpenLogDirectory()
     {
+        var logPath = FileSystem.CacheDirectory;
+
         try
         {
-            await Launcher.OpenAsync(FileSystem.Current.CacheDirectory);
+            try
+            {
+                bool didOpen = await Launcher.OpenAsync(new Uri($"file://{logPath}"));
+                if(!didOpen)
+                    await Launcher.OpenAsync(logPath);
+            }
+            catch
+            {
+            }
         }
         catch
         {

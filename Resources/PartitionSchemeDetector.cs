@@ -234,15 +234,29 @@ namespace NextUI_Setup_Wizard.Resources
             try
             {
                 // Method 1: diskutil info (most reliable)
-                var diskutilResult = await TryDiskutil(volumePath);
-                if (diskutilResult.Scheme != PartitionScheme.Unknown)
-                {
-                    return diskutilResult;
-                }
+                Logger.LogImmediate("DetectMacOSPartitionScheme");
+
+                var result = await DiskUtilMac.DetectDiskInfo(volumePath);
+
+                info.Scheme = result.PartitionScheme == "MBR" ? PartitionScheme.MBR : PartitionScheme.Unknown;
+                info.FileSystem = result.FileSystem;
+                info.ErrorMessage= result.ErrorMessage;
+                info.Details= result.Details;
+                info.SizeBytes = result.SizeBytes;
+                info.IsRemovable = result.IsRemovable;
+
+                return info;
+             
+
+                //var diskutilResult = await TryDiskutil(volumePath);
+                //if (diskutilResult.Scheme != PartitionScheme.Unknown)
+                //{
+                //    return diskutilResult;
+                //}
 
                 // Method 2: df + system_profiler
-                var alternativeResult = await TryMacOSAlternative(volumePath);
-                return alternativeResult;
+                //var alternativeResult = await TryMacOSAlternative(volumePath);
+                //return alternativeResult;
             }
             catch (Exception ex)
             {
@@ -253,9 +267,10 @@ namespace NextUI_Setup_Wizard.Resources
 
         private static async Task<PartitionInfo> TryDiskutil(string volumePath, string? testVolumeInfo = null, string? testDiskInfo = null)
         {
+            Logger.LogImmediate($"TryDiskutil started for volume path: {volumePath}");
+
             using var logger = new Logger();
-            logger.Log($"TryDiskutil started for volume path: {volumePath}");
-            
+
             var info = new PartitionInfo();
 
             try
@@ -529,9 +544,6 @@ namespace NextUI_Setup_Wizard.Resources
 
         private static async Task<string> RunCommand(string command, string arguments)
         {
-#if IOS
-            return "Command execution not supported on iOS";
-#else
             try
             {
                 var startInfo = new ProcessStartInfo
@@ -560,7 +572,6 @@ namespace NextUI_Setup_Wizard.Resources
             }
 
             return "";
-#endif
         }
 
         private static async Task<string> RunPowerShell(string script)
