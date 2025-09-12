@@ -836,7 +836,7 @@
             {
                 // Fallback to DriveInfo if PartitionSchemeDetector fails
                 fileSystem = targetDrive.DriveFormat.ToUpperInvariant();
-                logger.Log($"Fallback to DriveInfo from PartitionSchemeDetector failure, fileSystem: {fileSystem}");
+                logger.Log($"Fallback to DriveInfo from PartitionSchemeDetector failure({partitionInfo.ErrorMessage}), fileSystem: {fileSystem}");
             }
             else
             {

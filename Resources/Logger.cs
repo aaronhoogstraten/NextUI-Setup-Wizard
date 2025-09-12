@@ -1,3 +1,4 @@
+using CoreVideo;
 using System;
 using System.IO;
 using System.Text;
@@ -13,9 +14,12 @@ namespace NextUI_Setup_Wizard.Resources
 
         private readonly StringBuilder _messages = new();
 
+
         public static void LogImmediate(string message)
         {
-            File.AppendAllText(LogPath, message);
+            var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+            var logLine = $"[{timestamp}] {message}";
+            File.AppendAllText(LogPath, logLine);
         }
 
         public void Log(string message)
