@@ -30,7 +30,9 @@ namespace NextUI_Setup_Wizard.Resources
                 "autorun.inf",    // Windows
                 ".DS_Store",      // macOS
                 "._.DS_Store",    // macOS resource fork
-                "__MACOSX"        // macOS archive metadata
+                "__MACOSX",        // macOS archive metadata
+                ".fseventsd",       // macOS
+                ".Spotlight-V100",  // macOS
             };
             
             return systemFiles.Any(sf => fileName.Equals(sf, StringComparison.OrdinalIgnoreCase));
