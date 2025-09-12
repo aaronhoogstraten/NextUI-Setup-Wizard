@@ -1,9 +1,13 @@
 @using NextUI_Setup_Wizard.Resources
+@using System.Runtime.InteropServices
 
 <div class="version-container">
     <button class="log-button" @onclick="OpenLogDirectory" title="@FileSystem.CacheDirectory">log</button>
     <div class="version-display">
         @VersionInfo.VersionString
+    </div>
+    <div class="version-display">
+        OS: @RuntimeInformation.RuntimeIdentifier
     </div>
 </div>
 
