@@ -86,7 +86,7 @@ namespace NextUI_Setup_Wizard.Resources
             }
             catch (Exception ex)
             {
-                info.ErrorMessage = $"Windows detection failed: {ex.Message}";
+                info.ErrorMessage = $"Windows detection failed: {ex}";
                 return info;
             }
         }
@@ -260,7 +260,7 @@ namespace NextUI_Setup_Wizard.Resources
             }
             catch (Exception ex)
             {
-                info.ErrorMessage = $"macOS detection failed: {ex.Message}";
+                info.ErrorMessage = $"macOS detection failed: {ex}";
                 return info;
             }
         }
