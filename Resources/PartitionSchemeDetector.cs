@@ -36,22 +36,13 @@ namespace NextUI_Setup_Wizard.Resources
         /// </summary>
         public static async Task<PartitionInfo> DetectPartitionScheme(string drivePath)
         {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                return await DetectWindowsPartitionScheme(drivePath);
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                return await DetectMacOSPartitionScheme(drivePath);
-            }
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                return await DetectLinuxPartitionScheme(drivePath);
-            }
-            else
-            {
-                return new PartitionInfo { ErrorMessage = "Unsupported platform" };
-            }
+#if WINDOWS
+            return await DetectWindowsPartitionScheme(drivePath);
+#elif MACCATALYST
+            return await DetectMacOSPartitionScheme(drivePath);
+#else
+            return new PartitionInfo { ErrorMessage = "Unsupported platform" };
+#endif
         }
 
         // ==========================================
@@ -137,14 +128,14 @@ namespace NextUI_Setup_Wizard.Resources
             {
                 var psScript = $@"
     try {{
-        # Get logical disk
+# Get logical disk
         $logicalDisk = Get-WmiObject -Class Win32_LogicalDisk -Filter ""DeviceID='{driveLetter}:'"" -ErrorAction SilentlyContinue
         if ($logicalDisk) {{
             Write-Output ""DriveType: $($logicalDisk.DriveType)""
             Write-Output ""FileSystem: $($logicalDisk.FileSystem)""
             Write-Output ""Size: $($logicalDisk.Size)""
         
-            # Get physical disk through partition
+# Get physical disk through partition
             $partition = Get-WmiObject -Class Win32_LogicalDiskToPartition | Where-Object {{ $_.Dependent -match '{driveLetter}:' }}
             if ($partition) {{
                 $diskPartition = Get-WmiObject -Class Win32_DiskPartition | Where-Object {{ $_.DeviceID -eq $partition.Antecedent.Split('""')[1] }}
@@ -157,7 +148,7 @@ namespace NextUI_Setup_Wizard.Resources
                             Write-Output ""MediaType: $($physicalDisk.MediaType)""
                             Write-Output ""InterfaceType: $($physicalDisk.InterfaceType)""
                         
-                            # Try to determine partition style from partition type
+# Try to determine partition style from partition type
                             if ($diskPartition.Type -eq 'GPT: Basic data partition') {{
                                 Write-Output ""PartitionStyle: GPT""
                             }} elseif ($diskPartition.Type -like '*EFI*') {{

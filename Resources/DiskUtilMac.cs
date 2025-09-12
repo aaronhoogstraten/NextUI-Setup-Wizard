@@ -31,13 +31,6 @@ namespace NextUI_Setup_Wizard.Resources
         {
             var info = new DiskInfo();
 
-            // Check if running on macOS
-            if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                info.ErrorMessage = "diskutil is only available on macOS";
-                return info;
-            }
-
             try
             {
                 // Get volume information using diskutil info
