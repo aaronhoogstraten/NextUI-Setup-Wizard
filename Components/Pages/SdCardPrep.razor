@@ -41,7 +41,7 @@
                 </div>
 
                 <div class="platform-instructions">
-                    @if (PartitionSchemeDetector.CurrentOS == "MAC")
+                    @if (Utils.CurrentOS == OSType.Mac)
                     {
                         <div class="platform-section">
                             <h5>🍎 macOS Instructions</h5>
@@ -58,7 +58,7 @@
                             </div>
                         </div>
                     }
-                    else if (PartitionSchemeDetector.CurrentOS == "WINDOWS")
+                    else if (Utils.CurrentOS == OSType.Windows)
                     {
                         <div class="platform-section">
                             <h5>🪟 Windows Instructions</h5>

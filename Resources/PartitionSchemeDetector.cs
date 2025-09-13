@@ -11,19 +11,6 @@ namespace NextUI_Setup_Wizard.Resources
 {
     public static class PartitionSchemeDetector
     {
-        public static string CurrentOS
-        {
-            get
-            {
-#if WINDOWS
-                return "WINDOWS";
-#elif MACCATALYST
-                return "MAC";
-#else
-                return "UNSUPPORTED";
-#endif
-            }
-        }
 
         public enum PartitionScheme
         {
@@ -238,12 +225,14 @@ namespace NextUI_Setup_Wizard.Resources
 
             try
             {
-                // Method 1: diskutil info (most reliable)
                 Logger.LogImmediate("DetectMacOSPartitionScheme");
 
                 var result = await DiskUtilMac.DetectDiskInfo(volumePath);
 
-                info.Scheme = result.PartitionScheme == "MBR" ? PartitionScheme.MBR : PartitionScheme.Unknown;
+                info.Scheme = result.PartitionScheme == "MBR" ? PartitionScheme.MBR 
+                    : result.PartitionScheme == "GPT" ? PartitionScheme.GPT
+                    : result.PartitionScheme == "APM" ? PartitionScheme.APM
+                    : PartitionScheme.Unknown;
                 info.FileSystem = result.FileSystem;
                 info.ErrorMessage= result.ErrorMessage;
                 info.Details= result.Details;
@@ -251,17 +240,6 @@ namespace NextUI_Setup_Wizard.Resources
                 info.IsRemovable = result.IsRemovable;
 
                 return info;
-             
-
-                //var diskutilResult = await TryDiskutil(volumePath);
-                //if (diskutilResult.Scheme != PartitionScheme.Unknown)
-                //{
-                //    return diskutilResult;
-                //}
-
-                // Method 2: df + system_profiler
-                //var alternativeResult = await TryMacOSAlternative(volumePath);
-                //return alternativeResult;
             }
             catch (Exception ex)
             {
