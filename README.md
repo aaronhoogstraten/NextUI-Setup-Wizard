@@ -1,6 +1,6 @@
 # NextUI Setup Wizard
 
-**A tool help set up NextUI on your handheld gaming device**
+**A tool to help set up NextUI on your handheld gaming device**
 
 ![NextUI Setup Wizard](https://img.shields.io/badge/Status-Unofficial-orange) ![Platform](https://img.shields.io/badge/Platform-Windows-blue) ![Platform](https://img.shields.io/badge/Platform-macOS-blue)
 
@@ -59,24 +59,34 @@ Use the latest release: https://github.com/aaronhoogstraten/NextUI-Setup-Wizard/
 - Checks for existing NextUI installations
 - Offers to wipe and prepare the card if needed
 
+<img width="790" height="520" alt="Screenshot 2025-09-13 134544" src="https://github.com/user-attachments/assets/96ac33a7-a302-4738-b3b7-d2a4ceb33c7e" />
+
 ### 2. NextUI Download
 - Downloads the latest NextUI release
 - Verifies file integrity with SHA256 checksums
 - Extracts files directly to your SD card
 - Can be skipped if NextUI is already installed
 
+<img width="790" height="520" alt="Screenshot 2025-09-13 134654" src="https://github.com/user-attachments/assets/7b97d713-ef0f-4756-8b8b-eb2b65028162" />
+
 ### 3. BIOS Configuration
 - Helps you add BIOS files for various gaming systems
 - Validates BIOS file formats and checksums
 - Organizes files in the correct directory structure
+
+<img width="790" height="520" alt="Screenshot 2025-09-13 134727" src="https://github.com/user-attachments/assets/550d2bc0-49ec-43af-9f19-89cf7a801b0d" />
 
 ### 4. ROM Configuration  
 - Assists with adding ROM files for your games
 - Supports multiple gaming systems (NES, SNES, Game Boy, etc.)
 - Checks ROM file formats and organization
 
+<img width="790" height="520" alt="Screenshot 2025-09-13 134739" src="https://github.com/user-attachments/assets/e19d62c5-9f18-4350-a64f-f05601ff4f44" />
+
 ### 5. Setup Complete
 - Provides final instructions for using your device
+
+<img width="790" height="520" alt="Screenshot 2025-09-13 152759" src="https://github.com/user-attachments/assets/60699829-55d2-4900-8913-f7dfdca45257" />
 
 ---
 ## Acknowledgements
