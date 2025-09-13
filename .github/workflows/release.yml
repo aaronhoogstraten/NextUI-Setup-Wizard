@@ -1,0 +1,79 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
+      release_name:
+        description: 'Release name (optional, defaults to tag)'
+        required: false
+        type: string
+      pre_release:
+        description: 'Mark as pre-release'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.create_tag.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and push tag
+        id: create_tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ inputs.tag }}" -m "Release ${{ inputs.tag }}"
+          git push origin "${{ inputs.tag }}"
+          echo "tag=${{ inputs.tag }}" >> $GITHUB_OUTPUT
+
+  build-windows:
+    needs: create-tag
+    uses: ./.github/workflows/build_windows.yml
+    with:
+      tag: ${{ needs.create-tag.outputs.tag }}
+
+  build-macos:
+    needs: create-tag
+    uses: ./.github/workflows/build_macos.yml
+    with:
+      tag: ${{ needs.create-tag.outputs.tag }}
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [create-tag, build-windows, build-macos]
+    steps:
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: NextUI-Setup-Wizard-Windows-${{ needs.create-tag.outputs.tag }}
+          path: ./artifacts
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: NextUI-Setup-Wizard-macOS-${{ needs.create-tag.outputs.tag }}
+          path: ./artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.create-tag.outputs.tag }}
+          name: ${{ inputs.release_name || needs.create-tag.outputs.tag }}
+          prerelease: ${{ inputs.pre_release }}
+          files: |
+            ./artifacts/NextUI-Setup-Wizard-Windows-${{ needs.create-tag.outputs.tag }}.zip
+            ./artifacts/NextUI-Setup-Wizard-macOS-${{ needs.create-tag.outputs.tag }}.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -2,10 +2,23 @@ name: Build Windows app
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag for artifact naming'
+        required: false
+        type: string
+        default: 'latest'
+    outputs:
+      artifact_name:
+        description: 'Name of the uploaded artifact'
+        value: ${{ jobs.build-windows.outputs.artifact_name }}
 
 jobs:
   build-windows:
     runs-on: windows-latest
+    outputs:
+      artifact_name: ${{ steps.upload.outputs.artifact-name }}
     
     steps:
     - name: Checkout code
@@ -54,9 +67,17 @@ jobs:
         Write-Host "Run script created at: $scriptPath"
         Write-Host ""
         
+    - name: Create ZIP archive
+      run: |
+        $sourceDir = "bin\Release\net9.0-windows10.0.19041.0"
+        $zipName = "NextUI-Setup-Wizard-Windows-${{ inputs.tag || 'latest' }}.zip"
+        Compress-Archive -Path "$sourceDir\*" -DestinationPath $zipName
+        Write-Host "Created ZIP: $zipName"
+
     - name: Upload artifacts
+      id: upload
       uses: actions/upload-artifact@v4
       with:
-        name: NextUI-Setup-Wizard
-        path: "bin/Release/net9.0-windows10.0.19041.0/*"
+        name: NextUI-Setup-Wizard-Windows-${{ inputs.tag || 'latest' }}
+        path: "NextUI-Setup-Wizard-Windows-${{ inputs.tag || 'latest' }}.zip"
         retention-days: 30

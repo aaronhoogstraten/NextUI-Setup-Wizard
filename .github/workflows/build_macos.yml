@@ -2,10 +2,23 @@ name: Build macOS App
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Release tag for artifact naming'
+        required: false
+        type: string
+        default: 'latest'
+    outputs:
+      artifact_name:
+        description: 'Name of the uploaded artifact'
+        value: ${{ jobs.build-macos.outputs.artifact_name }}
 
 jobs:
   build-macos:
     runs-on: macos-latest
+    outputs:
+      artifact_name: ${{ steps.upload.outputs.artifact-name }}
 
     steps:
       - uses: actions/checkout@v4
@@ -41,9 +54,17 @@ jobs:
             -p:CommitHash="${{ steps.commit.outputs.hash }}" \
             -o ./publish/macos-arm64
 
+      - name: Create macOS ZIP
+        run: |
+          cd ./publish/macos-arm64
+          zip -r "../../NextUI-Setup-Wizard-macOS-${{ inputs.tag || 'latest' }}.zip" ./*
+          cd ../..
+          echo "Created ZIP: NextUI-Setup-Wizard-macOS-${{ inputs.tag || 'latest' }}.zip"
+
       - name: Upload macOS ARM64 build artifacts
+        id: upload
         uses: actions/upload-artifact@v4
         with:
-          name: NextUI-Setup-Wizard_arm64
-          path: ./publish/macos-arm64/
+          name: NextUI-Setup-Wizard-macOS-${{ inputs.tag || 'latest' }}
+          path: "NextUI-Setup-Wizard-macOS-${{ inputs.tag || 'latest' }}.zip"
           retention-days: 30
