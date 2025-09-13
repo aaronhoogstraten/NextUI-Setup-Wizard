@@ -17,6 +17,10 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: write
+  actions: read
+
 jobs:
   create-tag:
     runs-on: ubuntu-latest
