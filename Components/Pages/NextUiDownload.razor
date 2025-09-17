@@ -148,7 +148,7 @@
             
             @if (!string.IsNullOrEmpty(downloadMessage))
             {
-                <div class="download-message @(downloadSuccess ? "success" : "error")">
+                <div data-ref="download-message" class="download-message @(downloadSuccess ? "success" : "error")">
                     @downloadMessage
                 </div>
             }
@@ -698,6 +698,12 @@
         StateHasChanged();
     }
 
+    private async Task ScrollToDownloadMessage()
+    {
+        await Task.Delay(50); // Allow DOM to render
+        await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"download-message\"]').scrollIntoView({behavior: 'smooth', block: 'end'});");
+    }
+
     private async Task DownloadAndExtractRelease()
     {
         var allZipAsset = GetAllZipAsset();
@@ -706,6 +712,7 @@
             downloadMessage = "No *-all.zip file found in the latest release";
             downloadSuccess = false;
             StateHasChanged();
+            await ScrollToDownloadMessage();
             return;
         }
 
@@ -740,6 +747,7 @@
                     downloadMessage = "Download cancelled - no directory selected";
                     downloadSuccess = false;
                     StateHasChanged();
+                    await ScrollToDownloadMessage();
                     return;
                 }
 
@@ -757,6 +765,7 @@
                 downloadMessage = $"The selected directory is not empty. Please select an empty directory for extraction.\n\nSelected path: {extractPath}";
                 downloadSuccess = false;
                 StateHasChanged();
+                await ScrollToDownloadMessage();
                 return;
             }
 
@@ -817,6 +826,7 @@
                 downloadMessage = "File verification failed: No SHA256 hash found for the downloaded file. Extraction aborted for security reasons.";
                 downloadSuccess = false;
                 StateHasChanged();
+                await ScrollToDownloadMessage();
                 return;
             }
 
@@ -834,6 +844,7 @@
                 downloadMessage = $"File verification failed! Expected SHA256: {allZipAsset.Sha256}, Got: {computedHash}";
                 downloadSuccess = false;
                 StateHasChanged();
+                await ScrollToDownloadMessage();
                 return;
             }
 
@@ -874,6 +885,7 @@
                 downloadMessage = "Extraction verification failed! The extracted files do not match the zip contents.";
                 downloadSuccess = false;
                 StateHasChanged();
+                await ScrollToDownloadMessage();
                 return;
             }
         
@@ -888,6 +900,7 @@
             downloadSuccess = true;
 
             StateHasChanged();
+            await ScrollToDownloadMessage();
 
             // Show success message briefly, then navigate to BIOS config
             await Task.Delay(2000);
@@ -902,6 +915,7 @@
             downloadMessage = $"Download failed: {ex.Message}";
             downloadSuccess = false;
             StateHasChanged();
+            await ScrollToDownloadMessage();
         
             // Try to cleanup temp file if it exists
             try
