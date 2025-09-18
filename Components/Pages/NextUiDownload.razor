@@ -704,15 +704,34 @@
         await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"download-message\"]').scrollIntoView({behavior: 'smooth', block: 'end'});");
     }
 
+    private async Task SetDownloadState(string message, bool success = false, bool stopDownloading = true)
+    {
+        if (stopDownloading)
+            isDownloading = false;
+        downloadMessage = message;
+        downloadSuccess = success;
+        StateHasChanged();
+        if (!string.IsNullOrEmpty(message))
+            await ScrollToDownloadMessage();
+    }
+
+    private void SetDownloadProgress(string progress = "", string status = "", int percentage = 0)
+    {
+        if (!string.IsNullOrEmpty(progress))
+            downloadProgress = progress;
+        if (!string.IsNullOrEmpty(status))
+            downloadStatus = status;
+        if (percentage > 0)
+            downloadPercentage = percentage;
+        StateHasChanged();
+    }
+
     private async Task DownloadAndExtractRelease()
     {
         var allZipAsset = GetAllZipAsset();
         if (allZipAsset == null)
         {
-            downloadMessage = "No *-all.zip file found in the latest release";
-            downloadSuccess = false;
-            StateHasChanged();
-            await ScrollToDownloadMessage();
+            await SetDownloadState("No *-all.zip file found in the latest release");
             return;
         }
 
@@ -721,10 +740,7 @@
             // Reset download state
             isDownloading = true;
             downloadMessage = "";
-            downloadPercentage = 0;
-            downloadProgress = "Preparing...";
-            downloadStatus = "Selecting download directory...";
-            StateHasChanged();
+            SetDownloadProgress("Preparing...", "Selecting download directory...", 0);
             
             // Auto-scroll to progress bar
             await Task.Delay(50); // Allow DOM to render
@@ -743,11 +759,7 @@
                 var folderResult = await FolderPicker.Default.PickAsync(CancellationToken.None);
                 if (folderResult == null || !folderResult.IsSuccessful)
                 {
-                    isDownloading = false;
-                    downloadMessage = "Download cancelled - no directory selected";
-                    downloadSuccess = false;
-                    StateHasChanged();
-                    await ScrollToDownloadMessage();
+                    await SetDownloadState("Download cancelled - no directory selected");
                     return;
                 }
 
@@ -755,31 +767,21 @@
             }
 
             // Validate that the directory is empty
-            downloadStatus = "Validating directory...";
-            downloadPercentage = 5;
-            StateHasChanged();
+            SetDownloadProgress(status: "Validating directory...", percentage: 5);
 
             if (!IsDirectoryEmpty(extractPath))
             {
-                isDownloading = false;
-                downloadMessage = $"The selected directory is not empty. Please select an empty directory for extraction.\n\nSelected path: {extractPath}";
-                downloadSuccess = false;
-                StateHasChanged();
-                await ScrollToDownloadMessage();
+                await SetDownloadState($"The selected directory is not empty. Please select an empty directory for extraction.\n\nSelected path: {extractPath}");
                 return;
             }
 
-            downloadStatus = $"Downloading to: {Path.GetFileName(extractPath)}";
-            downloadPercentage = 10;
-            StateHasChanged();
+            SetDownloadProgress(status: $"Downloading to: {Path.GetFileName(extractPath)}", percentage: 10);
 
             // Create temporary file for download
             var tempFilePath = Path.Combine(FileSystem.Current.CacheDirectory, allZipAsset.Name);
 
             // Download the zip file
-            downloadProgress = "Downloading...";
-            downloadStatus = $"Downloading {allZipAsset.Name}";
-            StateHasChanged();
+            SetDownloadProgress("Downloading...", $"Downloading {allZipAsset.Name}");
 
             using var response = await Http.GetAsync(allZipAsset.Url, HttpCompletionOption.ResponseHeadersRead);
             response.EnsureSuccessStatusCode();
@@ -807,9 +809,7 @@
 
                         if (totalBytes > 0)
                         {
-                            downloadPercentage = (int)((downloadedBytes * 50) / totalBytes) + 10; // 10-60% for download
-                            downloadStatus = $"Downloaded {FormatBytes(downloadedBytes)} of {FormatBytes(totalBytes)}";
-                            StateHasChanged();
+                            SetDownloadProgress(status: $"Downloaded {FormatBytes(downloadedBytes)} of {FormatBytes(totalBytes)}", percentage: (int)((downloadedBytes * 50) / totalBytes) + 10);
                         }
                     }
                 }
@@ -822,52 +822,33 @@
             if (string.IsNullOrEmpty(allZipAsset.Sha256))
             {
                 File.Delete(tempFilePath);
-                isDownloading = false;
-                downloadMessage = "File verification failed: No SHA256 hash found for the downloaded file. Extraction aborted for security reasons.";
-                downloadSuccess = false;
-                StateHasChanged();
-                await ScrollToDownloadMessage();
+                await SetDownloadState("File verification failed: No SHA256 hash found for the downloaded file. Extraction aborted for security reasons.");
                 return;
             }
 
-            downloadProgress = "Verifying...";
-            downloadStatus = "Verifying file integrity (SHA256)...";
-            downloadPercentage = 60;
-            StateHasChanged();
+            SetDownloadProgress("Verifying...", "Verifying file integrity (SHA256)...", 60);
             await Task.Delay(500);
 
             var computedHash = await ComputeSha256Async(tempFilePath);
             if (!computedHash.Equals(allZipAsset.Sha256, StringComparison.OrdinalIgnoreCase))
             {
                 File.Delete(tempFilePath);
-                isDownloading = false;
-                downloadMessage = $"File verification failed! Expected SHA256: {allZipAsset.Sha256}, Got: {computedHash}";
-                downloadSuccess = false;
-                StateHasChanged();
-                await ScrollToDownloadMessage();
+                await SetDownloadState($"File verification failed! Expected SHA256: {allZipAsset.Sha256}, Got: {computedHash}");
                 return;
             }
 
-            downloadStatus = "File integrity verified successfully";
-            downloadPercentage = 65;
-            StateHasChanged();
+            SetDownloadProgress(status: "File integrity verified successfully", percentage: 65);
             await Task.Delay(500);
 
             // Extract the zip file
-            downloadProgress = "Extracting...";
-            downloadStatus = "Extracting files...";
-            downloadPercentage = 70;
-            StateHasChanged();
+            SetDownloadProgress("Extracting...", "Extracting files...", 70);
             await Task.Delay(500);
 
             // Extract zip file directly to the specified directory
             ZipFile.ExtractToDirectory(tempFilePath, extractPath, true);
             
             // Verify extraction
-            downloadProgress = "Verifying...";
-            downloadStatus = "Verifying extraction...";
-            downloadPercentage = 85;
-            StateHasChanged();
+            SetDownloadProgress("Verifying...", "Verifying extraction...", 85);
             await Task.Delay(500);
             
             var extractionValid = VerifyExtraction(tempFilePath, extractPath);
@@ -880,12 +861,8 @@
                     Directory.Delete(extractPath, true);
                 }
                 catch { /* Ignore cleanup errors */ }
-                
-                isDownloading = false;
-                downloadMessage = "Extraction verification failed! The extracted files do not match the zip contents.";
-                downloadSuccess = false;
-                StateHasChanged();
-                await ScrollToDownloadMessage();
+
+                await SetDownloadState("Extraction verification failed! The extracted files do not match the zip contents.");
                 return;
             }
         
@@ -893,14 +870,8 @@
             File.Delete(tempFilePath);
         
             // Success
-            downloadPercentage = 100;
-            downloadProgress = "Complete!";
-            downloadStatus = "Download, extraction and verification completed successfully";
-            downloadMessage = $"NextUI {latestRelease?.TagName ?? "release"} has been successfully downloaded, extracted and verified to: {extractPath}";
-            downloadSuccess = true;
-
-            StateHasChanged();
-            await ScrollToDownloadMessage();
+            SetDownloadProgress("Complete!", "Download, extraction and verification completed successfully", 100);
+            await SetDownloadState($"NextUI {latestRelease?.TagName ?? "release"} has been successfully downloaded, extracted and verified to: {extractPath}", success: true, stopDownloading: false);
 
             // Show success message briefly, then navigate to BIOS config
             await Task.Delay(2000);
@@ -911,11 +882,7 @@
         }
         catch (Exception ex)
         {
-            isDownloading = false;
-            downloadMessage = $"Download failed: {ex.Message}";
-            downloadSuccess = false;
-            StateHasChanged();
-            await ScrollToDownloadMessage();
+            await SetDownloadState($"Download failed: {ex.Message}");
         
             // Try to cleanup temp file if it exists
             try

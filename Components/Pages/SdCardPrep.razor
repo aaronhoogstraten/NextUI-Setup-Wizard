@@ -703,6 +703,22 @@
         StateHasChanged();
     }
 
+    private void SetValidationState(string error = "", bool success = false, bool stopValidating = true)
+    {
+        if (stopValidating)
+            isValidating = false;
+        validationError = error;
+        validationSuccess = success;
+        StateHasChanged();
+    }
+
+    private void SetWipeState(string progress = "", int percentage = 0)
+    {
+        wipeProgress = progress;
+        wipePercentage = percentage;
+        StateHasChanged();
+    }
+
 
     private async Task SelectSDCard()
     {
@@ -717,9 +733,7 @@
             var folderResult = await FolderPicker.Default.PickAsync(CancellationToken.None);
             if (folderResult == null || !folderResult.IsSuccessful)
             {
-                isValidating = false;
-                validationError = "No directory selected. Please select your SD card's root directory.";
-                StateHasChanged();
+                SetValidationState("No directory selected. Please select your SD card's root directory.");
                 return;
             }
 
@@ -730,9 +744,7 @@
         }
         catch (Exception ex)
         {
-            isValidating = false;
-            validationError = $"Error selecting directory: {ex.Message}";
-            StateHasChanged();
+            SetValidationState($"Error selecting directory: {ex.Message}");
         }
     }
 
@@ -768,27 +780,21 @@
 
             if (targetDrive == null)
             {
-                validationError = "Could not identify the drive for the selected path. Please ensure you've selected the root directory of your SD card.";
-                isValidating = false;
-                StateHasChanged();
+                SetValidationState("Could not identify the drive for the selected path. Please ensure you've selected the root directory of your SD card.");
                 return;
             }
 
             // Check if it's a removable drive (typical for SD cards)
             if (targetDrive.DriveType != DriveType.Removable && targetDrive.DriveType != DriveType.Fixed)
             {
-                validationError = $"The selected drive appears to be a {targetDrive.DriveType} drive. Please select a removable SD card.";
-                isValidating = false;
-                StateHasChanged();
+                SetValidationState($"The selected drive appears to be a {targetDrive.DriveType} drive. Please select a removable SD card.");
                 return;
             }
 
             // Check if drive is ready
             if (!targetDrive.IsReady)
             {
-                validationError = "The selected drive is not ready. Please ensure your SD card is properly inserted and try again.";
-                isValidating = false;
-                StateHasChanged();
+                SetValidationState("The selected drive is not ready. Please ensure your SD card is properly inserted and try again.");
                 return;
             }
 
@@ -826,9 +832,7 @@
             // Validate file system
             if (fileSystem != "FAT32" && fileSystem != "EXFAT")
             {
-                validationError = $"Invalid file system detected: {fileSystem}. Please format your SD card to FAT32 or exFAT and try again.";
-                isValidating = false;
-                StateHasChanged();
+                SetValidationState($"Invalid file system detected: {fileSystem}. Please format your SD card to FAT32 or exFAT and try again.");
                 return;
             }
 
@@ -843,9 +847,7 @@
             const long minimumSpace = 100 * 1024 * 1024; // 100MB
             if (availableSpace < minimumSpace)
             {
-                validationError = $"Insufficient space on SD card. Available: {FormatBytes(availableSpace)}, Required: {FormatBytes(minimumSpace)}";
-                isValidating = false;
-                StateHasChanged();
+                SetValidationState($"Insufficient space on SD card. Available: {FormatBytes(availableSpace)}, Required: {FormatBytes(minimumSpace)}");
                 return;
             }
 
@@ -856,25 +858,19 @@
 
             if (usagePercentage > 10 && usedSpace > maxUsedSpace)
             {
-                validationError = $"SD card appears to contain significant data ({FormatBytes(usedSpace)} used, {usagePercentage:F1}% full). Please use a freshly formatted SD card to avoid conflicts.";
-                isValidating = false;
-                StateHasChanged();
+                SetValidationState($"SD card appears to contain significant data ({FormatBytes(usedSpace)} used, {usagePercentage:F1}% full). Please use a freshly formatted SD card to avoid conflicts.");
                 return;
             }
 
             if (!string.IsNullOrEmpty(partitionInfo.ErrorMessage))
             {
-                validationError = $"Could not detect partition scheme: {partitionInfo.ErrorMessage}";
-                isValidating = false;
-                StateHasChanged();
+                SetValidationState($"Could not detect partition scheme: {partitionInfo.ErrorMessage}");
                 return;
             }
             
             if (partitionInfo.Scheme != PartitionSchemeDetector.PartitionScheme.MBR)
             {
-                validationError = "SD card is not partitioned as Master Boot Record (MBR)";
-                isValidating = false;
-                StateHasChanged();
+                SetValidationState("SD card is not partitioned as Master Boot Record (MBR)");
                 return;
             }
 
@@ -886,22 +882,16 @@
             // If NextUI is not detected, check if the SD card is empty
             if (!nextUIDetected && !IsDirectoryEmpty(path))
             {
-                validationError = "SD card is not empty and does not contain a NextUI installation. Please use a freshly formatted SD card to avoid conflicts with existing files.";
-                isValidating = false;
-                StateHasChanged();
+                SetValidationState("SD card is not empty and does not contain a NextUI installation. Please use a freshly formatted SD card to avoid conflicts with existing files.");
                 return;
             }
 
             // All validations passed
-            isValidating = false;
-            validationSuccess = true;
-            StateHasChanged();
+            SetValidationState(success: true);
         }
         catch (Exception ex)
         {
-            isValidating = false;
-            validationError = $"Validation error: {ex.Message}";
-            StateHasChanged();
+            SetValidationState($"Validation error: {ex.Message}");
         }
     }
 
@@ -964,10 +954,8 @@
         catch (Exception ex)
         {
             isWiping = false;
-            validationError = $"Failed to wipe SD card: {ex.Message}";
             showWipeConfirmation = false;
-            validationSuccess = false;
-            StateHasChanged();
+            SetValidationState($"Failed to wipe SD card: {ex.Message}");
         }
     }
 
@@ -975,9 +963,7 @@
     {
         try
         {
-            wipeProgress = "Scanning files and directories...";
-            wipePercentage = 10;
-            StateHasChanged();
+            SetWipeState("Scanning files and directories...", 10);
             await Task.Delay(500);
 
             // Get all files and directories
@@ -989,16 +975,12 @@
                 .Where(entry => !FileSystemHelper.IsSystemFile(Path.GetFileName(entry)))
                 .ToList();
 
-            wipeProgress = $"Found {allEntries.Count} items to delete...";
-            wipePercentage = 20;
-            StateHasChanged();
+            SetWipeState($"Found {allEntries.Count} items to delete...", 20);
             await Task.Delay(500);
 
             if (allEntries.Count == 0)
             {
-                wipeProgress = "SD card is already empty";
-                wipePercentage = 100;
-                StateHasChanged();
+                SetWipeState("SD card is already empty", 100);
                 return;
             }
 
@@ -1018,9 +1000,7 @@
                     File.Delete(file);
                     processedItems++;
 
-                    wipePercentage = 20 + (int)((processedItems * 60.0) / totalItems);
-                    wipeProgress = $"Deleting files... ({processedItems}/{totalItems})";
-                    StateHasChanged();
+                    SetWipeState($"Deleting files... ({processedItems}/{totalItems})", 20 + (int)((processedItems * 60.0) / totalItems));
 
                     if (processedItems % 10 == 0) // Update UI every 10 files
                         await Task.Delay(10);
@@ -1042,9 +1022,7 @@
                         Directory.Delete(directory, true);
                         processedItems++;
 
-                        wipePercentage = 20 + (int)((processedItems * 60.0) / totalItems);
-                        wipeProgress = $"Deleting directories... ({processedItems}/{totalItems})";
-                        StateHasChanged();
+                        SetWipeState($"Deleting directories... ({processedItems}/{totalItems})", 20 + (int)((processedItems * 60.0) / totalItems));
 
                         if (processedItems % 5 == 0) // Update UI every 5 directories
                             await Task.Delay(10);
@@ -1057,9 +1035,7 @@
                 }
             }
 
-            wipeProgress = "Verifying deletion...";
-            wipePercentage = 90;
-            StateHasChanged();
+            SetWipeState("Verifying deletion...", 90);
             await Task.Delay(500);
 
             // Verify the SD card is now empty (except system files)
@@ -1072,9 +1048,7 @@
                 throw new Exception($"Failed to delete all files. {remainingEntries.Count} items remain.");
             }
 
-            wipeProgress = "SD card wiped successfully!";
-            wipePercentage = 100;
-            StateHasChanged();
+            SetWipeState("SD card wiped successfully!", 100);
             await Task.Delay(1000);
         }
         catch (Exception ex)
