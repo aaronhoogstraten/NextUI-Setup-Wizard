@@ -10,7 +10,7 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
-<div class="release-container">
+<div class="compact-container">
     <h3 data-ref="page-header">Latest NextUI Release</h3>
 
     @if (!string.IsNullOrEmpty(SelectedPath))
@@ -36,7 +36,7 @@
     else if (latestRelease != null)
     {
         <div class="release-info">
-            <div class="release-header">
+            <div class="release-header flex flex-wrap align-center gap-md mb-lg">
                 <h4>@latestRelease.Name</h4>
                 @if (!string.IsNullOrEmpty(latestRelease.TagName) && !latestRelease.TagName.Equals(latestRelease.Name, StringComparison.OrdinalIgnoreCase))
                 {
@@ -48,12 +48,14 @@
                 }
             </div>
             
-            <div class="release-meta">
-                @if (!string.IsNullOrEmpty(latestRelease.Author))
-                {
-                    <p><strong>Author:</strong> @latestRelease.Author</p>
-                }
-                <p><strong>Published:</strong> @latestRelease.PublishedDate</p>
+            <div class="release-meta compact-card">
+                <div class="two-column">
+                    @if (!string.IsNullOrEmpty(latestRelease.Author))
+                    {
+                        <p class="secondary-text"><strong>Author:</strong> @latestRelease.Author</p>
+                    }
+                    <p class="secondary-text"><strong>Published:</strong> @latestRelease.PublishedDate</p>
+                </div>
             </div>
             
             @if (!string.IsNullOrEmpty(latestRelease.Body))
@@ -89,7 +91,7 @@
                 </div>
             }
             
-            <div class="actions">
+            <div class="inline-actions mt-lg">
                 <a href="@latestRelease.Url" target="_blank" class="btn btn-primary">View on GitHub</a>
                 <button class="btn btn-secondary" @onclick="LoadReleaseInfo">Refresh</button>
                 @{
@@ -108,26 +110,31 @@
                         }
                     </button>
                 }
-                else if (latestRelease.Assets?.Any() == true)
-                {
-                    <div class="no-all-zip">
-                        <p><em>No *-all.zip file found in assets. Available files:</em></p>
-                        <ul class="asset-list">
-                            @foreach (var asset in latestRelease.Assets)
-                            {
-                                <li>@asset.Name</li>
-                            }
-                        </ul>
-                    </div>
-                }
-                else
-                {
-                    <div class="no-assets-debug">
-                        <p><em>No assets detected. This might be a parsing issue.</em></p>
+            </div>
+            @{
+                var allZipAsset2 = GetAllZipAsset();
+            }
+            @if (allZipAsset2 == null && latestRelease.Assets?.Any() == true)
+            {
+                <div class="no-all-zip compact-card mt-md">
+                    <p class="text-sm"><em>No *-all.zip file found in assets. Available files:</em></p>
+                    <ul class="asset-list text-xs">
+                        @foreach (var asset in latestRelease.Assets)
+                        {
+                            <li>@asset.Name</li>
+                        }
+                    </ul>
+                </div>
+            }
+            else if (allZipAsset2 == null)
+            {
+                <div class="no-assets-debug compact-card mt-md">
+                    <p class="text-sm"><em>No assets detected. This might be a parsing issue.</em></p>
+                    <div class="inline-actions mt-md">
                         <button class="btn btn-info" @onclick="ShowDebugInfo">Show Debug Info</button>
                     </div>
-                }
-            </div>
+                </div>
+            }
             
             @if (isDownloading)
             {
@@ -135,13 +142,13 @@
                     <div class="progress-bar">
                         <div class="progress-fill" style="width: @(downloadPercentage)%"></div>
                     </div>
-                    <p class="progress-text">@downloadStatus</p>
+                    <p class="progress-text text-sm">@downloadStatus</p>
                 </div>
             }
             
             @if (!string.IsNullOrEmpty(downloadMessage))
             {
-                <div class="download-message @(downloadSuccess ? "success" : "error")">
+                <div data-ref="download-message" class="download-message @(downloadSuccess ? "success" : "error")">
                     @downloadMessage
                 </div>
             }
@@ -174,12 +181,6 @@
 </div>
 
 <style>
-    .release-container {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 20px;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    }
     
     .loading, .error {
         text-align: center;
@@ -191,13 +192,6 @@
         color: #d73a49;
     }
     
-    .release-header {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-    }
     
     .release-header h4 {
         margin: 0;
@@ -223,12 +217,6 @@
         color: #856404;
     }
     
-    .release-meta {
-        background: #f6f8fa;
-        padding: 15px;
-        border-radius: 6px;
-        margin-bottom: 20px;
-    }
     
     .release-meta p {
         margin: 5px 0;
@@ -246,12 +234,14 @@
     
     .notes-content {
         background: #f6f8fa;
-        padding: 15px;
-        border-radius: 6px;
+        padding: var(--spacing-md);
+        border-radius: 4px;
         border-left: 4px solid #0366d6;
         overflow-x: auto;
-        max-height: 400px;
+        max-height: 350px;
         overflow-y: auto;
+        font-size: 0.9rem;
+        line-height: 1.4;
     }
     
     .assets {
@@ -288,11 +278,6 @@
         text-decoration: underline;
     }
     
-    .actions {
-        display: flex;
-        gap: 10px;
-        margin-top: 20px;
-    }
     
     .btn {
         padding: 10px 16px;
@@ -713,14 +698,40 @@
         StateHasChanged();
     }
 
+    private async Task ScrollToDownloadMessage()
+    {
+        await Task.Delay(50); // Allow DOM to render
+        await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"download-message\"]').scrollIntoView({behavior: 'smooth', block: 'end'});");
+    }
+
+    private async Task SetDownloadState(string message, bool success = false, bool stopDownloading = true)
+    {
+        if (stopDownloading)
+            isDownloading = false;
+        downloadMessage = message;
+        downloadSuccess = success;
+        StateHasChanged();
+        if (!string.IsNullOrEmpty(message))
+            await ScrollToDownloadMessage();
+    }
+
+    private void SetDownloadProgress(string progress = "", string status = "", int percentage = 0)
+    {
+        if (!string.IsNullOrEmpty(progress))
+            downloadProgress = progress;
+        if (!string.IsNullOrEmpty(status))
+            downloadStatus = status;
+        if (percentage > 0)
+            downloadPercentage = percentage;
+        StateHasChanged();
+    }
+
     private async Task DownloadAndExtractRelease()
     {
         var allZipAsset = GetAllZipAsset();
         if (allZipAsset == null)
         {
-            downloadMessage = "No *-all.zip file found in the latest release";
-            downloadSuccess = false;
-            StateHasChanged();
+            await SetDownloadState("No *-all.zip file found in the latest release");
             return;
         }
 
@@ -729,10 +740,7 @@
             // Reset download state
             isDownloading = true;
             downloadMessage = "";
-            downloadPercentage = 0;
-            downloadProgress = "Preparing...";
-            downloadStatus = "Selecting download directory...";
-            StateHasChanged();
+            SetDownloadProgress("Preparing...", "Selecting download directory...", 0);
             
             // Auto-scroll to progress bar
             await Task.Delay(50); // Allow DOM to render
@@ -751,10 +759,7 @@
                 var folderResult = await FolderPicker.Default.PickAsync(CancellationToken.None);
                 if (folderResult == null || !folderResult.IsSuccessful)
                 {
-                    isDownloading = false;
-                    downloadMessage = "Download cancelled - no directory selected";
-                    downloadSuccess = false;
-                    StateHasChanged();
+                    await SetDownloadState("Download cancelled - no directory selected");
                     return;
                 }
 
@@ -762,30 +767,21 @@
             }
 
             // Validate that the directory is empty
-            downloadStatus = "Validating directory...";
-            downloadPercentage = 5;
-            StateHasChanged();
+            SetDownloadProgress(status: "Validating directory...", percentage: 5);
 
             if (!IsDirectoryEmpty(extractPath))
             {
-                isDownloading = false;
-                downloadMessage = $"The selected directory is not empty. Please select an empty directory for extraction.\n\nSelected path: {extractPath}";
-                downloadSuccess = false;
-                StateHasChanged();
+                await SetDownloadState($"The selected directory is not empty. Please select an empty directory for extraction.\n\nSelected path: {extractPath}");
                 return;
             }
 
-            downloadStatus = $"Downloading to: {Path.GetFileName(extractPath)}";
-            downloadPercentage = 10;
-            StateHasChanged();
+            SetDownloadProgress(status: $"Downloading to: {Path.GetFileName(extractPath)}", percentage: 10);
 
             // Create temporary file for download
             var tempFilePath = Path.Combine(FileSystem.Current.CacheDirectory, allZipAsset.Name);
 
             // Download the zip file
-            downloadProgress = "Downloading...";
-            downloadStatus = $"Downloading {allZipAsset.Name}";
-            StateHasChanged();
+            SetDownloadProgress("Downloading...", $"Downloading {allZipAsset.Name}");
 
             using var response = await Http.GetAsync(allZipAsset.Url, HttpCompletionOption.ResponseHeadersRead);
             response.EnsureSuccessStatusCode();
@@ -813,9 +809,7 @@
 
                         if (totalBytes > 0)
                         {
-                            downloadPercentage = (int)((downloadedBytes * 50) / totalBytes) + 10; // 10-60% for download
-                            downloadStatus = $"Downloaded {FormatBytes(downloadedBytes)} of {FormatBytes(totalBytes)}";
-                            StateHasChanged();
+                            SetDownloadProgress(status: $"Downloaded {FormatBytes(downloadedBytes)} of {FormatBytes(totalBytes)}", percentage: (int)((downloadedBytes * 50) / totalBytes) + 10);
                         }
                     }
                 }
@@ -828,50 +822,33 @@
             if (string.IsNullOrEmpty(allZipAsset.Sha256))
             {
                 File.Delete(tempFilePath);
-                isDownloading = false;
-                downloadMessage = "File verification failed: No SHA256 hash found for the downloaded file. Extraction aborted for security reasons.";
-                downloadSuccess = false;
-                StateHasChanged();
+                await SetDownloadState("File verification failed: No SHA256 hash found for the downloaded file. Extraction aborted for security reasons.");
                 return;
             }
 
-            downloadProgress = "Verifying...";
-            downloadStatus = "Verifying file integrity (SHA256)...";
-            downloadPercentage = 60;
-            StateHasChanged();
+            SetDownloadProgress("Verifying...", "Verifying file integrity (SHA256)...", 60);
             await Task.Delay(500);
 
             var computedHash = await ComputeSha256Async(tempFilePath);
             if (!computedHash.Equals(allZipAsset.Sha256, StringComparison.OrdinalIgnoreCase))
             {
                 File.Delete(tempFilePath);
-                isDownloading = false;
-                downloadMessage = $"File verification failed! Expected SHA256: {allZipAsset.Sha256}, Got: {computedHash}";
-                downloadSuccess = false;
-                StateHasChanged();
+                await SetDownloadState($"File verification failed! Expected SHA256: {allZipAsset.Sha256}, Got: {computedHash}");
                 return;
             }
 
-            downloadStatus = "File integrity verified successfully";
-            downloadPercentage = 65;
-            StateHasChanged();
+            SetDownloadProgress(status: "File integrity verified successfully", percentage: 65);
             await Task.Delay(500);
 
             // Extract the zip file
-            downloadProgress = "Extracting...";
-            downloadStatus = "Extracting files...";
-            downloadPercentage = 70;
-            StateHasChanged();
+            SetDownloadProgress("Extracting...", "Extracting files...", 70);
             await Task.Delay(500);
 
             // Extract zip file directly to the specified directory
             ZipFile.ExtractToDirectory(tempFilePath, extractPath, true);
             
             // Verify extraction
-            downloadProgress = "Verifying...";
-            downloadStatus = "Verifying extraction...";
-            downloadPercentage = 85;
-            StateHasChanged();
+            SetDownloadProgress("Verifying...", "Verifying extraction...", 85);
             await Task.Delay(500);
             
             var extractionValid = VerifyExtraction(tempFilePath, extractPath);
@@ -884,11 +861,8 @@
                     Directory.Delete(extractPath, true);
                 }
                 catch { /* Ignore cleanup errors */ }
-                
-                isDownloading = false;
-                downloadMessage = "Extraction verification failed! The extracted files do not match the zip contents.";
-                downloadSuccess = false;
-                StateHasChanged();
+
+                await SetDownloadState("Extraction verification failed! The extracted files do not match the zip contents.");
                 return;
             }
         
@@ -896,13 +870,8 @@
             File.Delete(tempFilePath);
         
             // Success
-            downloadPercentage = 100;
-            downloadProgress = "Complete!";
-            downloadStatus = "Download, extraction and verification completed successfully";
-            downloadMessage = $"NextUI {latestRelease?.TagName ?? "release"} has been successfully downloaded, extracted and verified to: {extractPath}";
-            downloadSuccess = true;
-
-            StateHasChanged();
+            SetDownloadProgress("Complete!", "Download, extraction and verification completed successfully", 100);
+            await SetDownloadState($"NextUI {latestRelease?.TagName ?? "release"} has been successfully downloaded, extracted and verified to: {extractPath}", success: true, stopDownloading: false);
 
             // Show success message briefly, then navigate to BIOS config
             await Task.Delay(2000);
@@ -913,10 +882,7 @@
         }
         catch (Exception ex)
         {
-            isDownloading = false;
-            downloadMessage = $"Download failed: {ex.Message}";
-            downloadSuccess = false;
-            StateHasChanged();
+            await SetDownloadState($"Download failed: {ex.Message}");
         
             // Try to cleanup temp file if it exists
             try
