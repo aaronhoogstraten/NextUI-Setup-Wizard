@@ -89,5 +89,12 @@ Use the latest release: https://github.com/aaronhoogstraten/NextUI-Setup-Wizard/
 <img width="790" height="520" alt="Screenshot 2025-09-13 152759" src="https://github.com/user-attachments/assets/60699829-55d2-4900-8913-f7dfdca45257" />
 
 ---
+## NextUI Log Zipper Tool
+
+To export all the `.userdata` logs from an existing NextUI installation, click the wrench icon button on the top left of the SD Card Preparation page and follow the instructions:
+
+<img width="533" height="466" alt="Screenshot 2025-09-21 150121" src="https://github.com/user-attachments/assets/c9283c1b-a595-4915-8f42-cdb091bd0f00" />
+
+---
 ## Acknowledgements
 - K-Wall for their generous time given in helping test the macOS version.
