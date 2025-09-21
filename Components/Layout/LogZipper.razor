@@ -1,0 +1,554 @@
+@using System.IO
+@using System.IO.Compression
+@using CommunityToolkit.Maui.Storage
+@using NextUI_Setup_Wizard.Resources
+@inject IJSRuntime JSRuntime
+
+<!-- Log Zipper overlay -->
+@if (IsVisible)
+{
+    <div class="overlay" @onclick="Hide">
+        <div class="overlay-content" @onclick:stopPropagation="true">
+            <div class="overlay-header">
+                <h4>NextUI Log Zipper Tool</h4>
+                <button class="close-btn" @onclick="Hide">×</button>
+            </div>
+            <div class="overlay-body">
+                @if (!string.IsNullOrEmpty(logZipperError))
+                {
+                    <div class="error-message">
+                        <h5>❌ Error</h5>
+                        <p>@logZipperError</p>
+                    </div>
+                }
+
+                @if (isZippingLogs)
+                {
+                    <div class="zipping-progress">
+                        <h5>📦 Creating Log Archive...</h5>
+                        <p>@zipProgress</p>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: @(zipPercentage)%"></div>
+                        </div>
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(zipCompleteMessage))
+                {
+                    <div class="success-message">
+                        <h5>✅ Success</h5>
+                        <p>@zipCompleteMessage</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="tool-description">
+                        <p>This tool will search for all log files from a previously prepared NextUI installation and create a single zip archive.</p>
+                        <p><strong>Search location:</strong> <code>{sdCardPath}/.userdata/*/logs/</code></p>
+                    </div>
+
+                    <div class="sd-card-selection">
+                        @if (!string.IsNullOrEmpty(selectedLogPath))
+                        {
+                            <div class="selected-path">
+                                <p><strong>Selected SD Card Path:</strong></p>
+                                <p class="path-display">@selectedLogPath</p>
+                            </div>
+                        }
+
+                        <div class="tool-actions">
+                            <button class="btn btn-primary" @onclick="SelectSDCardForLogs">
+                                📁 Select SD Card Directory
+                            </button>
+                            @if (!string.IsNullOrEmpty(selectedLogPath))
+                            {
+                                <button class="btn btn-success" @onclick="ZipLogFiles">
+                                    📦 Create Log Archive
+                                </button>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback OnHide { get; set; }
+
+    private string selectedLogPath = "";
+    private string logZipperError = "";
+    private bool isZippingLogs = false;
+    private string zipProgress = "";
+    private int zipPercentage = 0;
+    private string zipCompleteMessage = "";
+
+    private async Task Hide()
+    {
+        selectedLogPath = "";
+        logZipperError = "";
+        isZippingLogs = false;
+        zipProgress = "";
+        zipPercentage = 0;
+        zipCompleteMessage = "";
+
+        await OnHide.InvokeAsync();
+    }
+
+    private async Task SelectSDCardForLogs()
+    {
+        try
+        {
+            logZipperError = "";
+            zipCompleteMessage = "";
+            StateHasChanged();
+
+            // Use folder picker to select SD card root
+            var folderResult = await FolderPicker.Default.PickAsync(CancellationToken.None);
+            if (folderResult == null || !folderResult.IsSuccessful)
+            {
+                logZipperError = "No directory selected. Please select your SD card's root directory.";
+                StateHasChanged();
+                return;
+            }
+
+            selectedLogPath = folderResult.Folder.Path;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            logZipperError = $"Error selecting directory: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private async Task ZipLogFiles()
+    {
+        try
+        {
+            isZippingLogs = true;
+            zipProgress = "Scanning for log directories...";
+            zipPercentage = 0;
+            logZipperError = "";
+            zipCompleteMessage = "";
+            StateHasChanged();
+
+            await Task.Delay(500); // Allow UI to update
+
+            // Look for .userdata directory
+            var userDataPath = Path.Combine(selectedLogPath, ".userdata");
+            if (!Directory.Exists(userDataPath))
+            {
+                logZipperError = $"No .userdata directory found at {selectedLogPath}. This doesn't appear to be a NextUI installation.";
+                isZippingLogs = false;
+                StateHasChanged();
+                return;
+            }
+
+            // Find all subdirectories that contain logs folders
+            var logDirectories = new List<string>();
+            var subDirectories = Directory.GetDirectories(userDataPath);
+
+            zipProgress = $"Found {subDirectories.Length} subdirectories in .userdata, checking for logs...";
+            zipPercentage = 10;
+            StateHasChanged();
+            await Task.Delay(300);
+
+            foreach (var subDir in subDirectories)
+            {
+                var logsPath = Path.Combine(subDir, "logs");
+                if (Directory.Exists(logsPath))
+                {
+                    logDirectories.Add(logsPath);
+                }
+            }
+
+            if (logDirectories.Count == 0)
+            {
+                logZipperError = "No log directories found in any .userdata subdirectories.";
+                isZippingLogs = false;
+                StateHasChanged();
+                return;
+            }
+
+            zipProgress = $"Found {logDirectories.Count} log directories. Creating archive...";
+            zipPercentage = 20;
+            StateHasChanged();
+            await Task.Delay(300);
+
+            // Get NextUI version for the filename
+            var version = await GetNextUIVersion(selectedLogPath);
+
+            // Sanitize version string for filename use
+            if (!string.IsNullOrEmpty(version))
+            {
+                // Remove or replace invalid filename characters
+                version = version.Replace(" ", "_")
+                                .Replace("/", "_")
+                                .Replace("\\", "_")
+                                .Replace(":", "_")
+                                .Replace("*", "_")
+                                .Replace("?", "_")
+                                .Replace("\"", "_")
+                                .Replace("<", "_")
+                                .Replace(">", "_")
+                                .Replace("|", "_")
+                                .Replace("\n", "_")
+                                .Replace("\r", "_");
+            }
+
+            // Create the zip file in the cache directory
+            var cachePath = FileSystem.CacheDirectory;
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var zipFileName = string.IsNullOrEmpty(version)
+                ? $"NextUI_logs_{timestamp}.zip"
+                : $"NextUI_logs_{version}_{timestamp}.zip";
+            var zipFilePath = Path.Combine(cachePath, zipFileName);
+
+            using (var zip = ZipFile.Open(zipFilePath, ZipArchiveMode.Create))
+            {
+                int processedDirs = 0;
+                foreach (var logDir in logDirectories)
+                {
+                    var relativePath = Path.GetRelativePath(userDataPath, logDir);
+                    zipProgress = $"Adding {relativePath} to archive...";
+                    zipPercentage = 20 + (int)((processedDirs * 70.0) / logDirectories.Count);
+                    StateHasChanged();
+                    await Task.Delay(100);
+
+                    // Add all files from this logs directory
+                    var logFiles = Directory.GetFiles(logDir, "*", SearchOption.AllDirectories);
+                    foreach (var logFile in logFiles)
+                    {
+                        var relativeFilePath = Path.GetRelativePath(userDataPath, logFile);
+                        zip.CreateEntryFromFile(logFile, relativeFilePath);
+                    }
+
+                    processedDirs++;
+                }
+            }
+
+            zipProgress = "Archive created successfully!";
+            zipPercentage = 100;
+            StateHasChanged();
+            await Task.Delay(500);
+
+            zipCompleteMessage = $"Log archive created successfully!\n\nFile:\n{zipFileName}\n\nLocation:\n{cachePath}\n\nThe archive contains {logDirectories.Count} log directories.";
+            isZippingLogs = false;
+            StateHasChanged();
+
+            // Automatically open the cache directory
+            await Utils.OpenDirectoryAsync(cachePath);
+        }
+        catch (Exception ex)
+        {
+            logZipperError = $"Failed to create log archive: {ex.Message}";
+            isZippingLogs = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<string?> GetNextUIVersion(string sdCardPath)
+    {
+        try
+        {
+            // Check for MinUI.zip and read .system/version.txt from inside the zip
+            var minUIZipPath = Path.Combine(sdCardPath, "MinUI.zip");
+            if (File.Exists(minUIZipPath))
+            {
+                try
+                {
+                    using var zip = ZipFile.OpenRead(minUIZipPath);
+                    var versionEntry = zip.GetEntry(".system/version.txt");
+                    if (versionEntry != null)
+                    {
+                        using var stream = versionEntry.Open();
+                        using var reader = new StreamReader(stream);
+                        var content = await reader.ReadToEndAsync();
+                        if (content.Contains("NextUI", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return content.Trim();
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // Check for .system\version.txt directly on filesystem
+            var systemVersionPath = Path.Combine(sdCardPath, ".system", "version.txt");
+            if (File.Exists(systemVersionPath))
+            {
+                try
+                {
+                    var content = await File.ReadAllTextAsync(systemVersionPath);
+                    if (content.Contains("NextUI", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return content.Trim();
+                    }
+                }
+                catch { }
+            }
+
+            return null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+}
+
+<style>
+    /* Overlay styles */
+    .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        padding: 20px;
+    }
+
+    .overlay-content {
+        background: white;
+        border-radius: 8px;
+        max-width: 600px;
+        width: 100%;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .overlay-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px;
+        border-bottom: 1px solid #e1e5e9;
+        background: #f6f8fa;
+        border-radius: 8px 8px 0 0;
+    }
+
+        .overlay-header h4 {
+            margin: 0;
+            color: #24292e;
+            font-size: 1.3em;
+        }
+
+    .close-btn {
+        background: none;
+        border: none;
+        font-size: 24px;
+        color: #586069;
+        cursor: pointer;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: all 0.2s;
+    }
+
+        .close-btn:hover {
+            background: #e1e5e9;
+            color: #24292e;
+        }
+
+    .overlay-body {
+        padding: 20px;
+    }
+
+    .tool-description {
+        background: #f6f8fa;
+        padding: 15px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+        border-left: 4px solid #0366d6;
+    }
+
+        .tool-description p {
+            margin: 5px 0;
+            color: #24292e;
+            line-height: 1.5;
+        }
+
+        .tool-description code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 0.9em;
+            color: #d73a49;
+        }
+
+    .sd-card-selection {
+        margin-top: 20px;
+    }
+
+    .selected-path {
+        background: #e6fffa;
+        border: 1px solid #9ae6b4;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-left: 4px solid #28a745;
+    }
+
+        .selected-path p {
+            margin: 5px 0;
+            color: #155724;
+        }
+
+    .path-display {
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 0.9em;
+        word-break: break-all;
+        background: rgba(255, 255, 255, 0.7);
+        padding: 8px;
+        border-radius: 4px;
+        border: 1px solid #c3e6cb;
+    }
+
+    .tool-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .error-message {
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-left: 4px solid #dc3545;
+    }
+
+        .error-message h5 {
+            margin: 0 0 8px 0;
+            color: #721c24;
+            font-size: 1.1em;
+        }
+
+        .error-message p {
+            margin: 0;
+            color: #721c24;
+        }
+
+    .success-message {
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-left: 4px solid #28a745;
+    }
+
+        .success-message h5 {
+            margin: 0 0 8px 0;
+            color: #155724;
+            font-size: 1.1em;
+        }
+
+        .success-message p {
+            margin: 0;
+            color: #155724;
+            white-space: pre-line;
+        }
+
+    .zipping-progress {
+        background: #e7f3ff;
+        border: 1px solid #b3d9ff;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-left: 4px solid #007acc;
+    }
+
+        .zipping-progress h5 {
+            margin: 0 0 8px 0;
+            color: #004d7a;
+            font-size: 1.1em;
+        }
+
+        .zipping-progress p {
+            margin: 8px 0;
+            color: #004d7a;
+        }
+
+    .btn {
+        padding: 10px 16px;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #f6f8fa;
+        color: #24292e;
+        text-decoration: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        transition: all 0.2s;
+        gap: 6px;
+    }
+
+        .btn:hover {
+            background: #f3f4f6;
+            border-color: #d0d7de;
+        }
+
+    .btn-primary {
+        background: #2da44e;
+        color: white;
+        border-color: #2da44e;
+    }
+
+        .btn-primary:hover {
+            background: #2c974b;
+            border-color: #2c974b;
+        }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+        border-color: #28a745;
+    }
+
+        .btn-success:hover {
+            background: #218838;
+            border-color: #1e7e34;
+        }
+
+    .progress-bar {
+        width: 100%;
+        height: 8px;
+        background-color: #e9ecef;
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 10px 0;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background-color: #007acc;
+        transition: width 0.3s ease;
+    }
+
+    @@media (max-width: 768px) {
+        .tool-actions {
+            justify-content: center;
+        }
+
+        .overlay {
+            padding: 10px;
+        }
+    }
+</style>
