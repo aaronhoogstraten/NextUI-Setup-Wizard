@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 
 namespace NextUI_Setup_Wizard.Resources
 {
@@ -22,6 +23,25 @@ namespace NextUI_Setup_Wizard.Resources
 #else
                 return OSType.Unsupported;
 #endif
+            }
+        }
+
+        /// <summary>
+        /// Opens a directory in the system's default file manager.
+        /// Attempts multiple methods to ensure cross-platform compatibility.
+        /// </summary>
+        /// <param name="directoryPath">The path to the directory to open</param>
+        /// <returns>A task representing the asynchronous operation</returns>
+        public static async Task OpenDirectoryAsync(string directoryPath)
+        {
+            try
+            {
+                bool didOpen = await Launcher.OpenAsync(new Uri($"file://{directoryPath}"));
+                if (!didOpen)
+                    await Launcher.OpenAsync(directoryPath);
+            }
+            catch
+            {
             }
         }
     }

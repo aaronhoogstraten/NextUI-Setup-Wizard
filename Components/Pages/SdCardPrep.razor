@@ -905,6 +905,7 @@
         .success-message p {
             margin: 0;
             color: #155724;
+            white-space: pre-line;
         }
 
     .zipping-progress {
@@ -1698,26 +1699,12 @@
             StateHasChanged();
             await Task.Delay(500);
 
-            zipCompleteMessage = $"Log archive created successfully!\n\nFile: {zipFileName}\nLocation: {cachePath}\n\nThe archive contains {logDirectories.Count} log directories.";
+            zipCompleteMessage = $"Log archive created successfully!\n\nFile:\n{zipFileName}\n\nLocation:\n{cachePath}\n\nThe archive contains {logDirectories.Count} log directories.";
             isZippingLogs = false;
             StateHasChanged();
 
             // Automatically open the cache directory
-            try
-            {
-                try
-                {
-                    bool didOpen = await Launcher.OpenAsync(new Uri($"file://{cachePath}"));
-                    if(!didOpen)
-                        await Launcher.OpenAsync(cachePath);
-                }
-                catch
-                {
-                }
-            }
-            catch
-            {
-            }
+            await Utils.OpenDirectoryAsync(cachePath);
         }
         catch (Exception ex)
         {

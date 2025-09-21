@@ -12,22 +12,7 @@
     private async Task OpenLogDirectory()
     {
         var logPath = FileSystem.CacheDirectory;
-
-        try
-        {
-            try
-            {
-                bool didOpen = await Launcher.OpenAsync(new Uri($"file://{logPath}"));
-                if(!didOpen)
-                    await Launcher.OpenAsync(logPath);
-            }
-            catch
-            {
-            }
-        }
-        catch
-        {
-        }
+        await Utils.OpenDirectoryAsync(logPath);
     }
 }
 
