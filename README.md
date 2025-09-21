@@ -36,14 +36,14 @@ Use the latest release: https://github.com/aaronhoogstraten/NextUI-Setup-Wizard/
 - Windows 10/11, x64 
 
 **Instructions:**
-- Extract the **NextUI-Setup-Wizard-Windows-v1.0.0.zip** and then open the `Launch NextUI Setup Wizard.bat` file to run the wizard.
+- Extract the **NextUI-Setup-Wizard-Windows-{version}.zip** and then open the `Launch NextUI Setup Wizard.bat` file to run the wizard.
 
 ### For Mac users:
 **Requirements:** 
 - macOS 15.0+, arm64 
 
 **Instructions:**
-- Extract the **NextUI-Setup-Wizard-macOS-v1.0.0.zip** and then open the `NextUI Setup Wizard-1.0.pkg`.
+- Extract the **NextUI-Setup-Wizard-macOS-{version}.zip** and then open the `NextUI Setup Wizard-1.0.pkg`.
 - You will receive a popup that says the app cannot be opened. Follow the instructions here to proceed https://support.apple.com/en-us/102445#openanyway:
   1. Open System Settings.
   2. Click Privacy & Security, scroll down, and click the Open Anyway button to confirm your intent to open or install the app.

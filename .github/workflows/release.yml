@@ -75,6 +75,46 @@ jobs:
           tag_name: ${{ needs.create-tag.outputs.tag }}
           name: ${{ inputs.release_name || needs.create-tag.outputs.tag }}
           prerelease: ${{ inputs.pre_release }}
+          body: |
+            ### For Windows users:
+
+            **Requirements:**
+
+            - Windows 10/11, x64
+
+
+
+            **Instructions:**
+
+            - Extract the **NextUI-Setup-Wizard-Windows-${{ needs.create-tag.outputs.tag }}.zip** and then open the `Launch NextUI Setup Wizard.bat` file to run the wizard.
+
+
+
+            ---
+
+
+
+            ### For Mac users:
+
+            **Requirements:**
+
+            - macOS 15.0+, arm64
+
+
+
+            **Instructions:**
+
+            - Extract the **NextUI-Setup-Wizard-macOS-${{ needs.create-tag.outputs.tag }}.zip** and then open the `NextUI Setup Wizard-1.0.pkg`.
+
+            - You will receive a popup that says the app cannot be opened. Follow the instructions here to proceed https://support.apple.com/en-us/102445#openanyway:
+
+              1. Open System Settings.
+
+              2. Click Privacy & Security, scroll down, and click the Open Anyway button to confirm your intent to open or install the app.
+
+              3. The warning prompt reappears and, if you're absolutely sure that you want to open the app anyway, you can click Open.
+
+              4. The app is now saved as an exception to your security settings, and you can open it in the future by double-clicking it, just as you can any authorized app.
           files: |
             ./artifacts/NextUI-Setup-Wizard-Windows-${{ needs.create-tag.outputs.tag }}.zip
             ./artifacts/NextUI-Setup-Wizard-macOS-${{ needs.create-tag.outputs.tag }}.zip
