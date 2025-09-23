@@ -825,24 +825,22 @@
 
                 if (validFiles.Count > 0)
                 {
-                    statusMessage = $"Added {validFiles.Count} ROM file(s) to {system.SystemName}";
+                    var message = $"Added {validFiles.Count} ROM file(s) to {system.SystemName}";
                     if (invalidFiles.Count > 0)
                     {
-                        statusMessage += $". {invalidFiles.Count} file(s) were skipped due to unsupported format.";
+                        message += $". {invalidFiles.Count} file(s) were skipped due to unsupported format.";
                     }
-                    isSuccess = true;
+                    await SetStatusMessage(message, true);
                 }
                 else
                 {
-                    statusMessage = $"No valid ROM files selected for {system.SystemName}. Supported formats: {string.Join(", ", system.SupportedFormats)}";
-                    isSuccess = false;
+                    await SetStatusMessage($"No valid ROM files selected for {system.SystemName}. Supported formats: {string.Join(", ", system.SupportedFormats)}", false);
                 }
             }
         }
         catch (Exception ex)
         {
-            statusMessage = $"Error selecting ROM files: {ex.Message}";
-            isSuccess = false;
+            await SetStatusMessage($"Error selecting ROM files: {ex.Message}", false);
         }
         finally
         {
@@ -858,23 +856,19 @@
         StateHasChanged();
     }
 
-    private void ClearSystemSelection(RomSystem system)
+    private async Task ClearSystemSelection(RomSystem system)
     {
         system.SelectedFiles.Clear();
-        statusMessage = $"Cleared all ROM files for {system.SystemName}";
-        isSuccess = true;
-        StateHasChanged();
+        await SetStatusMessage($"Cleared all ROM files for {system.SystemName}", true);
     }
 
-    private void ClearAllSelections()
+    private async Task ClearAllSelections()
     {
         foreach (var system in romSystems)
         {
             system.SelectedFiles.Clear();
         }
-        statusMessage = "All ROM selections cleared.";
-        isSuccess = true;
-        StateHasChanged();
+        await SetStatusMessage("All ROM selections cleared.", true);
     }
 
     private async Task CopyRomsToDirectories()
@@ -885,9 +879,7 @@
 
         if (allSelectedFiles.Count == 0)
         {
-            statusMessage = "No ROM files selected to copy.";
-            isSuccess = false;
-            StateHasChanged();
+            await SetStatusMessage("No ROM files selected to copy.", false);
             return;
         }
 
@@ -932,10 +924,8 @@
             copyStatus = "All ROM files copied successfully";
 
             var systemsCopied = romSystems.Where(s => s.SelectedFiles.Count > 0).Count();
-            statusMessage = $"Successfully copied {allSelectedFiles.Count} ROM file(s) to {systemsCopied} system(s).";
-            isSuccess = true;
             hasSuccessfullyCopiedFiles = true;
-            StateHasChanged();
+            await SetStatusMessage($"Successfully copied {allSelectedFiles.Count} ROM file(s) to {systemsCopied} system(s).", true);
 
             // Reset after 3 seconds
             await Task.Delay(3000);
@@ -945,23 +935,32 @@
         catch (Exception ex)
         {
             isCopying = false;
-            statusMessage = $"Error copying ROM files: {ex.Message}";
-            isSuccess = false;
-            StateHasChanged();
+            await SetStatusMessage($"Error copying ROM files: {ex.Message}", false);
         }
     }
 
-    private Task SkipRomSetup()
+    private async Task SkipRomSetup()
     {
-        statusMessage = "ROM setup skipped. You can add ROM files later by copying them to the appropriate system directories.";
-        isSuccess = true;
-        StateHasChanged();
+        await SetStatusMessage("ROM setup skipped. You can add ROM files later by copying them to the appropriate system directories.", true);
 
         Navigation.NavigateTo("/setup-complete");
-        return Task.CompletedTask;
     }
 
-    private void ToggleSnesSystemCode(RomSystem system)
+    private async Task ScrollToStatusMessage()
+    {
+        await Task.Delay(50); // Allow DOM to render
+        await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('.status-message').scrollIntoView({behavior: 'smooth', block: 'center'});");
+    }
+
+    private async Task SetStatusMessage(string message, bool success)
+    {
+        statusMessage = message;
+        isSuccess = success;
+        StateHasChanged();
+        await ScrollToStatusMessage();
+    }
+
+    private async Task ToggleSnesSystemCode(RomSystem system)
     {
         if (system.SystemCode == "SUPA")
         {
@@ -972,12 +971,10 @@
             system.SystemCode = "SUPA";
         }
 
-        statusMessage = $"System code changed to {system.SystemCode}. ROM path updated to: {system.RomPath}";
-        isSuccess = true;
-        StateHasChanged();
+        await SetStatusMessage($"System code changed to {system.SystemCode}. ROM path updated to: {system.RomPath}", true);
     }
 
-    private void ToggleGbaSystemCode(RomSystem system)
+    private async Task ToggleGbaSystemCode(RomSystem system)
     {
         if (system.SystemCode == "GBA")
         {
@@ -988,9 +985,7 @@
             system.SystemCode = "GBA";
         }
 
-        statusMessage = $"System code changed to {system.SystemCode}. ROM path updated to: {system.RomPath}";
-        isSuccess = true;
-        StateHasChanged();
+        await SetStatusMessage($"System code changed to {system.SystemCode}. ROM path updated to: {system.RomPath}", true);
     }
 
     // Method to set the extracted path (call this when navigating from another page)
