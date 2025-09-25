@@ -1,0 +1,830 @@
+@page "/adb-config"
+@using System.IO
+@using Microsoft.Maui.Storage
+@using NextUI_Setup_Wizard.Resources
+@using static NextUI_Setup_Wizard.Resources.Utils
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+
+<div class="compact-container">
+    <h3 data-ref="page-header">ADB Configuration</h3>
+    <p class="intro-text">Configure Android Debug Bridge (ADB) to transfer files directly to your emulation device without removing the SD card. <strong>Note:</strong> NextUI should already be installed on your device before using this method.</p>
+
+
+    <div class="setup-steps">
+        <div class="step-section">
+            <h4 class="step-title">📱 Step 1: Enable Developer Options on Your Device</h4>
+            <div class="step-content">
+                <p>Before using ADB, you must enable Developer Options and USB Debugging on your emulation device:</p>
+                <ol>
+                    <li>Go to <strong>Settings</strong> → <strong>About</strong> (or <strong>About Device</strong>)</li>
+                    <li>Tap <strong>Build Number</strong> 7 times until you see "You are now a developer"</li>
+                    <li>Go back to <strong>Settings</strong> → <strong>Developer Options</strong></li>
+                    <li>Enable <strong>USB Debugging</strong></li>
+                    <li>Connect your device to this computer via USB cable</li>
+                    <li>If prompted on your device, allow USB debugging for this computer</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="step-section">
+            <h4 class="step-title">🔧 Step 2: Install Android Platform Tools</h4>
+            <div class="step-content">
+                <p>Select the Android Platform Tools zip file that you downloaded from the Android Developer website:</p>
+
+                <div class="platform-tools-section">
+                    @if (!string.IsNullOrEmpty(selectedPlatformToolsPath))
+                    {
+                        <div class="selected-file-info">
+                            <span class="file-icon">📦</span>
+                            <span class="file-name">@Path.GetFileName(selectedPlatformToolsPath)</span>
+                            <button class="btn btn-sm btn-secondary" @onclick="ClearPlatformToolsSelection">Clear</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="no-file-selected">
+                            <span class="status-icon">○</span>
+                            <span>No platform-tools zip file selected</span>
+                        </div>
+                    }
+
+                    <button class="btn btn-primary" @onclick="SelectPlatformToolsZip" disabled="@isSelectingFile">
+                        @if (isSelectingFile)
+                        {
+                            <span>Selecting...</span>
+                        }
+                        else
+                        {
+                            <span>Select Platform Tools ZIP</span>
+                        }
+                    </button>
+
+                    @if (!string.IsNullOrEmpty(selectedPlatformToolsPath))
+                    {
+                        <button class="btn btn-success" @onclick="ExtractPlatformTools" disabled="@isExtracting">
+                            @if (isExtracting)
+                            {
+                                <span>@extractProgress</span>
+                            }
+                            else
+                            {
+                                <span>Extract Platform Tools</span>
+                            }
+                        </button>
+                    }
+                </div>
+
+                @if (platformToolsExtractor?.IsAdbAvailable() == true)
+                {
+                    <div class="success-message">
+                        <span class="status-icon success">✓</span>
+                        <span>Platform tools extracted successfully! ADB is ready.</span>
+                    </div>
+                }
+
+                @if (isExtracting)
+                {
+                    <div class="extraction-progress">
+                        <div class="progress-text">@extractStatus</div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="step-section">
+            <h4 class="step-title">📱 Step 3: Connect Device & Verify Installation</h4>
+            <div class="step-content">
+                <p>Connect to your emulation device and verify that NextUI is properly installed:</p>
+
+                <div class="device-section">
+                    <button class="btn btn-info" @onclick="RefreshDevices" disabled="@isRefreshingDevices">
+                        @if (isRefreshingDevices)
+                        {
+                            <span>Checking...</span>
+                        }
+                        else
+                        {
+                            <span>Check for Devices</span>
+                        }
+                    </button>
+
+                    @if (adbDevices.Any())
+                    {
+                        <div class="devices-list">
+                            <h5>Connected Devices:</h5>
+                            @foreach (var device in adbDevices)
+                            {
+                                <div class="device-item @(device.IsOnline ? "online" : "offline")">
+                                    <div class="device-info">
+                                        <span class="device-status">@(device.IsOnline ? "🟢" : "🔴")</span>
+                                        <span class="device-name">@device.DisplayName</span>
+                                        <span class="device-status-text">(@device.Status)</span>
+                                    </div>
+                                    @if (device.IsOnline)
+                                    {
+                                        <button class="btn btn-sm btn-primary" @onclick="() => SelectDevice(device)">
+                                            @if (selectedDevice?.Id == device.Id)
+                                            {
+                                                <span>Selected ✓</span>
+                                            }
+                                            else
+                                            {
+                                                <span>Select</span>
+                                            }
+                                        </button>
+                                    }
+                                </div>
+                            }
+                        </div>
+
+                        @if (selectedDevice != null)
+                        {
+                            <div class="selected-device-info">
+                                <h5>Selected Device: @selectedDevice.DisplayName</h5>
+                                @if (deviceStorage != null)
+                                {
+                                    <div class="storage-info">
+                                        <p><strong>Storage:</strong> @deviceStorage.AvailableGB.ToString("F1") GB available of @deviceStorage.TotalGB.ToString("F1") GB total</p>
+                                        <div class="storage-bar">
+                                            <div class="storage-fill" style="width: @(deviceStorage.UsedPercentage.ToString("F1"))%"></div>
+                                        </div>
+                                    </div>
+                                }
+
+                                <button class="btn btn-success" @onclick="VerifyDeviceDirectories" disabled="@isVerifyingDevice">
+                                    @if (isVerifyingDevice)
+                                    {
+                                        <span>@verifyProgress</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Verify NextUI Installation</span>
+                                    }
+                                </button>
+                            </div>
+                        }
+                    }
+                    else if (hasCheckedDevices)
+                    {
+                        <div class="no-devices-message">
+                            <span class="status-icon">⚠️</span>
+                            <span>No devices found. Make sure your device is connected and USB debugging is enabled.</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="action-section">
+        @if (isAdbReady && selectedDevice != null && isDeviceVerified)
+        {
+            <div class="ready-message">
+                <span class="status-icon success">✅</span>
+                <span><strong>ADB is configured and ready!</strong> You can now use ADB mode for BIOS and ROM setup.</span>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn-success" @onclick="NavigateToBiosConfigAdb">Continue to BIOS Setup (ADB)</button>
+                <button class="btn btn-outline" @onclick="NavigateToSdCardConfig">Use SD Card Instead</button>
+            </div>
+        }
+        else
+        {
+            <div class="incomplete-message">
+                <span class="status-icon">ℹ️</span>
+                <span>Complete all steps above to use ADB mode, or continue with SD card mode.</span>
+            </div>
+
+            <div class="action-buttons">
+                <button class="btn btn-outline" @onclick="NavigateToSdCardConfig">Continue with SD Card Mode</button>
+            </div>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(statusMessage))
+    {
+        <div class="status-message @(isSuccess ? "success" : "error")">
+            @statusMessage
+        </div>
+    }
+</div>
+
+<style>
+
+    .intro-text {
+        color: #586069;
+        margin-bottom: 30px;
+        font-size: 1.1em;
+    }
+
+    .setup-steps {
+        margin-bottom: 30px;
+    }
+
+    .step-section {
+        background: #f6f8fa;
+        border: 1px solid #d0d7de;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        overflow: visible;
+    }
+
+    .step-title {
+        background: #24292e;
+        color: white;
+        margin: 0;
+        padding: 12px 16px;
+        font-size: 1.1em;
+    }
+
+    .step-content {
+        padding: 20px;
+    }
+
+    .step-content p {
+        color: #586069;
+        line-height: 1.6;
+    }
+
+    .step-content ol {
+        margin: 15px 0;
+        padding-left: 20px;
+    }
+
+    .step-content li {
+        margin-bottom: 8px;
+        color: #586069;
+    }
+
+    .platform-tools-section, .device-section {
+        background: white;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        padding: 15px;
+        margin: 15px 0;
+    }
+
+    .selected-file-info, .no-file-selected {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 15px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+
+    .file-icon {
+        font-size: 18px;
+    }
+
+    .file-name {
+        flex: 1;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        color: #24292e;
+    }
+
+    .devices-list {
+        margin: 15px 0;
+    }
+
+    .devices-list h5 {
+        margin-bottom: 10px;
+        color: #24292e;
+    }
+
+    .device-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        background: white;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        margin-bottom: 8px;
+    }
+
+    .device-item.online {
+        border-color: #28a745;
+        background: #f8fff9;
+    }
+
+    .device-item.offline {
+        border-color: #dc3545;
+        background: #fff8f8;
+    }
+
+    .device-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .device-name {
+        font-weight: 600;
+        color: #24292e;
+    }
+
+    .device-status-text {
+        color: #586069;
+        font-size: 0.9em;
+    }
+
+    .selected-device-info {
+        background: #f1f8ff;
+        border: 1px solid #c8e1ff;
+        border-radius: 6px;
+        padding: 15px;
+        margin: 15px 0;
+    }
+
+    .selected-device-info h5 {
+        margin: 0 0 15px 0;
+        color: #0366d6;
+    }
+
+    .storage-info {
+        margin: 10px 0;
+    }
+
+    .storage-bar {
+        width: 100%;
+        height: 8px;
+        background: #e1e4e8;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 5px;
+    }
+
+    .storage-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #28a745, #ffc107 70%, #dc3545 90%);
+        transition: width 0.3s ease;
+    }
+
+    .success-message, .no-devices-message, .ready-message, .incomplete-message {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px;
+        border-radius: 6px;
+        margin: 15px 0;
+    }
+
+    .success-message, .ready-message {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .no-devices-message, .incomplete-message {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+
+    .extraction-progress {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 4px;
+        padding: 10px;
+        margin: 10px 0;
+    }
+
+    .progress-text {
+        color: #495057;
+        font-size: 0.9em;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+    }
+
+    .action-section {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 30px;
+        text-align: center;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-top: 15px;
+        flex-wrap: wrap;
+    }
+
+    .status-icon {
+        font-size: 16px;
+    }
+
+    .status-icon.success {
+        color: #28a745;
+    }
+
+    .btn {
+        padding: 8px 16px;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        background: #f6f8fa;
+        color: #24292e;
+        text-decoration: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+        white-space: nowrap;
+        min-width: 120px;
+    }
+
+    .btn:hover {
+        background: #f3f4f6;
+        border-color: #d0d7de;
+    }
+
+    .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-primary {
+        background: #2da44e;
+        color: white;
+        border-color: #2da44e;
+    }
+
+    .btn-primary:hover {
+        background: #2c974b;
+        border-color: #2c974b;
+    }
+
+    .btn-success {
+        background: #28a745;
+        color: white;
+        border-color: #28a745;
+    }
+
+    .btn-success:hover {
+        background: #218838;
+        border-color: #1e7e34;
+    }
+
+    .btn-info {
+        background: #17a2b8;
+        color: white;
+        border-color: #17a2b8;
+    }
+
+    .btn-info:hover {
+        background: #138496;
+        border-color: #117a8b;
+    }
+
+    .btn-outline {
+        background: transparent;
+        color: #0366d6;
+        border-color: #0366d6;
+    }
+
+    .btn-outline:hover {
+        background: #0366d6;
+        color: white;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border-color: #6c757d;
+    }
+
+    .btn-secondary:hover {
+        background: #5c636a;
+        border-color: #5c636a;
+    }
+
+    .btn-sm {
+        padding: 4px 8px;
+        font-size: 12px;
+        min-width: 60px;
+    }
+
+    .status-message {
+        margin-top: 20px;
+        padding: 12px;
+        border-radius: 6px;
+        font-weight: 500;
+    }
+
+    .status-message.success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+
+    .status-message.error {
+        background: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    @@media (max-width: 768px) {
+        .compact-container {
+            padding: 15px;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+        }
+
+        .device-item {
+            flex-direction: column;
+            gap: 10px;
+            align-items: stretch;
+        }
+
+        .device-info {
+            justify-content: center;
+        }
+    }
+</style>
+
+@code {
+    private PlatformToolsExtractor? platformToolsExtractor;
+    private AdbService? adbService;
+    private AdbFileOperations? adbFileOps;
+
+    private string selectedPlatformToolsPath = "";
+    private bool isSelectingFile = false;
+    private bool isExtracting = false;
+    private string extractProgress = "";
+    private string extractStatus = "";
+
+    private List<AdbDevice> adbDevices = new();
+    private AdbDevice? selectedDevice;
+    private DeviceStorageInfo? deviceStorage;
+    private bool isRefreshingDevices = false;
+    private bool hasCheckedDevices = false;
+    private bool isVerifyingDevice = false;
+    private string verifyProgress = "";
+
+    private string statusMessage = "";
+    private bool isSuccess = false;
+
+    private bool isAdbReady => platformToolsExtractor?.IsAdbAvailable() == true;
+    private bool isDeviceVerified = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        platformToolsExtractor = new PlatformToolsExtractor();
+
+        if (platformToolsExtractor.IsAdbAvailable())
+        {
+            InitializeAdbService();
+            await RefreshDevices();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Remove splash-active classes to revert to normal background - CRITICAL for proper rendering
+            await JSRuntime.InvokeVoidAsync("eval", @"
+                document.documentElement.classList.remove('splash-active');
+                document.body.classList.remove('splash-active');
+                document.getElementById('app').classList.remove('splash-active');
+            ");
+
+            await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"page-header\"]').scrollIntoView({behavior: 'auto', block: 'start'});");
+        }
+    }
+
+    private void InitializeAdbService()
+    {
+        if (platformToolsExtractor != null && platformToolsExtractor.IsAdbAvailable())
+        {
+            adbService = new AdbService(platformToolsExtractor.AdbExecutablePath);
+        }
+    }
+
+    private async Task SelectPlatformToolsZip()
+    {
+        try
+        {
+            isSelectingFile = true;
+            StateHasChanged();
+
+            var options = new PickOptions()
+            {
+                PickerTitle = "Select Android Platform Tools ZIP file",
+                FileTypes = Utils.CurrentOS == OSType.Windows
+                    ? new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>> { { DevicePlatform.WinUI, new[] { ".zip" } } })
+                    : new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>> { { DevicePlatform.MacCatalyst, new[] { "zip" } } })
+            };
+
+            var fileResult = await FilePicker.Default.PickAsync(options);
+
+            if (fileResult != null)
+            {
+                if (PlatformToolsExtractor.ValidatePlatformToolsZip(fileResult.FullPath))
+                {
+                    selectedPlatformToolsPath = fileResult.FullPath;
+                    await SetStatusMessage("Valid platform-tools ZIP file selected.", true);
+                }
+                else
+                {
+                    await SetStatusMessage("Invalid platform-tools ZIP file. Please select the correct file from the Android Developer website.", false);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await SetStatusMessage($"Error selecting file: {ex.Message}", false);
+        }
+        finally
+        {
+            isSelectingFile = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ClearPlatformToolsSelection()
+    {
+        selectedPlatformToolsPath = "";
+        StateHasChanged();
+    }
+
+    private async Task ExtractPlatformTools()
+    {
+        if (platformToolsExtractor == null || string.IsNullOrEmpty(selectedPlatformToolsPath))
+            return;
+
+        try
+        {
+            isExtracting = true;
+            extractProgress = "Extracting...";
+            StateHasChanged();
+
+            var progress = new Progress<string>(status =>
+            {
+                extractStatus = status;
+                InvokeAsync(StateHasChanged);
+            });
+
+            var success = await platformToolsExtractor.ExtractPlatformToolsAsync(selectedPlatformToolsPath, progress);
+
+            if (success)
+            {
+                InitializeAdbService();
+                await SetStatusMessage("Platform tools extracted successfully! ADB is now available.", true);
+                await RefreshDevices();
+            }
+            else
+            {
+                await SetStatusMessage("Failed to extract platform tools. Please check the ZIP file and try again.", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            await SetStatusMessage($"Error extracting platform tools: {ex.Message}", false);
+        }
+        finally
+        {
+            isExtracting = false;
+            extractProgress = "";
+            extractStatus = "";
+            StateHasChanged();
+        }
+    }
+
+    private async Task RefreshDevices()
+    {
+        if (adbService == null)
+            return;
+
+        try
+        {
+            isRefreshingDevices = true;
+            StateHasChanged();
+
+            // First check if ADB is working
+            var adbWorking = await adbService.IsAdbWorkingAsync();
+            if (!adbWorking)
+            {
+                await SetStatusMessage("ADB is not working properly. Please check platform tools installation.", false);
+                return;
+            }
+
+            adbDevices = await adbService.GetDevicesAsync();
+            hasCheckedDevices = true;
+
+            if (adbDevices.Any(d => d.IsOnline))
+            {
+                await SetStatusMessage($"Found {adbDevices.Count(d => d.IsOnline)} online device(s).", true);
+            }
+            else if (adbDevices.Any())
+            {
+                await SetStatusMessage("Devices found but none are online. Check USB debugging is enabled.", false);
+            }
+            else
+            {
+                await SetStatusMessage("No devices found. Make sure device is connected and USB debugging is enabled.", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            await SetStatusMessage($"Error checking for devices: {ex.Message}", false);
+        }
+        finally
+        {
+            isRefreshingDevices = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SelectDevice(AdbDevice device)
+    {
+        selectedDevice = device;
+
+        if (adbService != null)
+        {
+            adbFileOps = new AdbFileOperations(adbService, device.Id);
+            deviceStorage = await adbService.GetStorageInfoAsync(device.Id);
+        }
+
+        await SetStatusMessage($"Selected device: {device.DisplayName}", true);
+        StateHasChanged();
+    }
+
+    private async Task VerifyDeviceDirectories()
+    {
+        if (adbFileOps == null)
+            return;
+
+        try
+        {
+            isVerifyingDevice = true;
+            verifyProgress = "Verifying...";
+            StateHasChanged();
+
+            var progress = new Progress<string>(status =>
+            {
+                verifyProgress = status;
+                InvokeAsync(StateHasChanged);
+            });
+
+            var result = await adbFileOps.VerifyNextUIDirectoriesAsync(progress);
+
+            if (result.IsSuccess)
+            {
+                isDeviceVerified = true;
+                await SetStatusMessage("NextUI installation verified on device!", true);
+            }
+            else
+            {
+                await SetStatusMessage($"NextUI verification failed: {result.Error}", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            await SetStatusMessage($"Error verifying device: {ex.Message}", false);
+        }
+        finally
+        {
+            isVerifyingDevice = false;
+            verifyProgress = "";
+            StateHasChanged();
+        }
+    }
+
+    private void NavigateToBiosConfigAdb()
+    {
+        // Store ADB configuration in session or pass via navigation
+        Navigation.NavigateTo("/bios-config-adb");
+    }
+
+    private void NavigateToSdCardConfig()
+    {
+        Navigation.NavigateTo("/sd-card-prep");
+    }
+
+    private async Task SetStatusMessage(string message, bool success)
+    {
+        statusMessage = message;
+        isSuccess = success;
+        StateHasChanged();
+
+        // Auto-clear after 5 seconds
+        await Task.Delay(5000);
+        if (statusMessage == message) // Only clear if it hasn't been replaced
+        {
+            statusMessage = "";
+            StateHasChanged();
+        }
+    }
+}
