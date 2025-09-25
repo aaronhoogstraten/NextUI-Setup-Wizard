@@ -1,19 +1,50 @@
 ﻿@page "/rom-config"
 @page "/rom-config/{ExtractedPath}"
+@page "/rom-config/{ExtractedPath}/{Mode}"
+@page "/rom-config/adb"
 @using System.IO
 @using System.Web
 @using Microsoft.Maui.Storage
 @using System.Net.Http
 @using System.IO.Compression
+@using NextUI_Setup_Wizard.Resources
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
 @inject HttpClient Http
 
 <div class="rom-container">
-    <h3 data-ref="page-header">ROM Configuration</h3>
-    <p class="intro-text">Please select ROM files for each gaming system. You can select multiple files at once for each system.</p>
+    <h3 data-ref="page-header">ROM Configuration@(isAdbMode ? " (ADB Mode)" : "")</h3>
+    <p class="intro-text">@(isAdbMode ? "Select ROM files for each gaming system. Files will be transferred directly to your emulation device via ADB." : "Please select ROM files for each gaming system. You can select multiple files at once for each system.")</p>
 
-    @if (!string.IsNullOrEmpty(extractedPath))
+    @if (isAdbMode)
+    {
+        <div class="adb-status">
+            @if (isAdbReady && selectedDevice != null)
+            {
+                <div class="device-info">
+                    <span class="status-icon success">📱</span>
+                    <span><strong>Connected Device:</strong> @selectedDevice.DisplayName</span>
+                    @if (deviceStorage != null)
+                    {
+                        <span class="storage-text">(@deviceStorage.AvailableGB.ToString("F1") GB available)</span>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="device-error">
+                    <span class="status-icon error">⚠️</span>
+                    <span>ADB device not configured. <a href="/adb-config">Go to ADB Configuration</a></span>
+                </div>
+            }
+        </div>
+
+        <div class="path-info">
+            <p><strong>Device ROM Path:</strong> @AdbFileOperations.NEXTUI_BASE_PATH/Roms</p>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(extractedPath) && !isAdbMode)
     {
         <div class="path-info">
             <p><strong>NextUI Installation Path:</strong> @extractedPath</p>
@@ -49,8 +80,8 @@
                     <div class="system-info">
                         <div class="file-info">
                             <div class="destination-path">
-                                <span class="path-label">Destination:</span>
-                                <span class="file-path">@system.RomPath</span>
+                                <span class="path-label">@(isAdbMode ? "Device Path:" : "Destination:")</span>
+                                <span class="file-path">@(isAdbMode ? system.DevicePath : system.RomPath)</span>
                             </div>
                             <div class="supported-formats">
                                 <span class="formats-label">Supported formats:</span>
@@ -125,17 +156,17 @@
 
         <div class="action-buttons">
             <button class="btn btn-secondary" @onclick="ClearAllSelections">Clear All</button>
-            <button class="btn btn-success" @onclick="CopyRomsToDirectories" disabled="@(totalSelectedFiles == 0 || isCopying)">
-                @if (isCopying)
+            <button class="btn btn-success" @onclick="@(isAdbMode ? TransferRomsToDevice : CopyRomsToDirectories)" disabled="@(totalSelectedFiles == 0 || (isAdbMode ? isTransferring : isCopying) || (isAdbMode && !isAdbReady))">
+                @if (isAdbMode ? isTransferring : isCopying)
                 {
-                    <span>@copyProgress</span>
+                    <span>@(isAdbMode ? transferProgress : copyProgress)</span>
                 }
                 else
                 {
-                    <span>Copy ROMs (@totalSelectedFiles files)</span>
+                    <span>@(isAdbMode ? $"Transfer ROMs ({totalSelectedFiles} files)" : $"Copy ROMs ({totalSelectedFiles} files)")</span>
                 }
             </button>
-            <button class="btn btn-info" @onclick="SkipRomSetup">@(hasSuccessfullyCopiedFiles ? "Continue to Installation" : "Skip ROM Setup")</button>
+            <button class="btn btn-info" @onclick="SkipRomSetup">@((isAdbMode ? hasSuccessfullyTransferredFiles : hasSuccessfullyCopiedFiles) ? "Continue to Installation" : "Skip ROM Setup")</button>
         </div>
     </div>
 
@@ -146,13 +177,13 @@
         </div>
     }
 
-    @if (isCopying)
+    @if (isAdbMode ? isTransferring : isCopying)
     {
-        <div data-ref="progress-container" class="copy-progress">
+        <div data-ref="progress-container" class="@(isAdbMode ? "transfer-progress" : "copy-progress")">
             <div class="progress-bar">
-                <div class="progress-fill" style="width: @(copyPercentage)%"></div>
+                <div class="progress-fill" style="width: @(isAdbMode ? transferPercentage : copyPercentage)%"></div>
             </div>
-            <p class="progress-text">@copyStatus</p>
+            <p class="progress-text">@(isAdbMode ? transferStatus : copyStatus)</p>
         </div>
     }
 </div>
@@ -559,11 +590,52 @@
             border: 1px solid #f5c6cb;
         }
 
-    .copy-progress {
+    .copy-progress, .transfer-progress {
         margin-top: 20px;
         padding: 15px;
         background: #f8f9fa;
         border-radius: 6px;
+    }
+
+    /* ADB-specific styles */
+    .adb-status {
+        background: #f1f8ff;
+        border: 1px solid #c8e1ff;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 20px;
+    }
+
+    .device-info {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #0366d6;
+    }
+
+    .device-error {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #d73a49;
+    }
+
+    .device-error a {
+        color: #0366d6;
+        text-decoration: underline;
+    }
+
+    .storage-text {
+        font-size: 0.9em;
+        color: #586069;
+    }
+
+    .status-icon.success {
+        color: #28a745;
+    }
+
+    .status-icon.error {
+        color: #d73a49;
     }
 
     .progress-bar {
@@ -631,6 +703,24 @@
 
 @code {
     [Parameter] public string? ExtractedPath { get; set; }
+    [Parameter] public string? Mode { get; set; }
+
+    // ADB-related properties
+    private PlatformToolsExtractor? platformToolsExtractor;
+    private AdbService? adbService;
+    private AdbFileOperations? adbFileOps;
+    private AdbDevice? selectedDevice;
+    private DeviceStorageInfo? deviceStorage;
+
+    // Transfer-related properties (for ADB mode)
+    private bool isTransferring = false;
+    private string transferProgress = "";
+    private string transferStatus = "";
+    private int transferPercentage = 0;
+    private bool hasSuccessfullyTransferredFiles = false;
+
+    private bool isAdbMode => !string.IsNullOrEmpty(Mode) && Mode.Equals("adb", StringComparison.OrdinalIgnoreCase);
+    private bool isAdbReady => platformToolsExtractor?.IsAdbAvailable() == true && selectedDevice != null;
 
     private string extractedPath = "";
     private bool isSelectingFiles = false;
@@ -648,7 +738,7 @@
 
     private List<RomSystem> romSystems = new();
 
-    protected override Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync()
     {
         // Get the extracted path from route parameter or query string
         if (!string.IsNullOrEmpty(ExtractedPath))
@@ -671,8 +761,34 @@
             }
         }
 
+        // Check if we're on the ADB-specific route
+        if (string.IsNullOrEmpty(Mode) && Navigation.Uri.EndsWith("/rom-config/adb"))
+        {
+            Mode = "adb";
+        }
+
+        // Initialize ADB components if in ADB mode
+        if (isAdbMode)
+        {
+            platformToolsExtractor = new PlatformToolsExtractor();
+
+            if (platformToolsExtractor.IsAdbAvailable())
+            {
+                adbService = new AdbService(platformToolsExtractor.AdbExecutablePath);
+
+                // Try to get first online device
+                var devices = await adbService.GetDevicesAsync();
+                selectedDevice = devices.FirstOrDefault(d => d.IsOnline);
+
+                if (selectedDevice != null)
+                {
+                    adbFileOps = new AdbFileOperations(adbService, selectedDevice.Id);
+                    deviceStorage = await adbService.GetStorageInfoAsync(selectedDevice.Id);
+                }
+            }
+        }
+
         InitializeRomSystems();
-        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -939,6 +1055,97 @@
         }
     }
 
+    private async Task TransferRomsToDevice()
+    {
+        if (adbFileOps == null || !isAdbReady)
+        {
+            await SetStatusMessage("ADB is not properly configured.", false);
+            return;
+        }
+
+        var allSelectedFiles = romSystems
+            .SelectMany(s => s.SelectedFiles.Select(f => new { System = s, File = f }))
+            .ToList();
+
+        if (allSelectedFiles.Count == 0)
+        {
+            await SetStatusMessage("No files selected to transfer.", false);
+            return;
+        }
+
+        try
+        {
+            isTransferring = true;
+            transferPercentage = 0;
+            transferProgress = "Transferring...";
+            transferStatus = "Preparing to transfer files...";
+            StateHasChanged();
+
+            // Auto-scroll to progress bar
+            await Task.Delay(50);
+            await JSRuntime.InvokeVoidAsync("eval", $"document.querySelector('[data-ref=\"progress-container\"]').scrollIntoView({{behavior: 'smooth', block: 'end'}});");
+
+            // Prepare file list for transfer
+            var romFilesToCopy = allSelectedFiles.Select(item => new RomFileCopy
+            {
+                SourcePath = item.File.FullPath,
+                FileName = item.File.FileName,
+                SystemCode = item.System.SystemCode,
+                SystemName = !string.IsNullOrEmpty(item.System.RomPathSystemName) ? item.System.RomPathSystemName : item.System.SystemName
+            }).ToList();
+
+            // Transfer files using ADB
+            var progress = new Progress<string>(status =>
+            {
+                transferStatus = status;
+                InvokeAsync(() =>
+                {
+                    // Update percentage based on status message if it contains progress info
+                    if (status.Contains("(") && status.Contains("/"))
+                    {
+                        var match = System.Text.RegularExpressions.Regex.Match(status, @"\((\d+)/(\d+)\)");
+                        if (match.Success && int.TryParse(match.Groups[1].Value, out var current) && int.TryParse(match.Groups[2].Value, out var total))
+                        {
+                            transferPercentage = (int)((current * 100) / total);
+                        }
+                    }
+                    StateHasChanged();
+                });
+            });
+
+            var result = await adbFileOps.CopyRomFilesAsync(romFilesToCopy, progress);
+
+            if (result.IsSuccess)
+            {
+                transferPercentage = 100;
+                transferProgress = "Complete!";
+                transferStatus = "All selected files transferred successfully";
+                hasSuccessfullyTransferredFiles = true;
+                await SetStatusMessage($"Successfully transferred {totalSelectedFiles} ROM file(s) to device.", true);
+
+                // Reset after 3 seconds
+                await Task.Delay(3000);
+                isTransferring = false;
+            }
+            else
+            {
+                await SetStatusMessage($"Error transferring files: {result.Error}", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            await SetStatusMessage($"Error transferring files: {ex.Message}", false);
+        }
+        finally
+        {
+            if (!hasSuccessfullyTransferredFiles)
+            {
+                isTransferring = false;
+            }
+            StateHasChanged();
+        }
+    }
+
     private async Task SkipRomSetup()
     {
         await SetStatusMessage("ROM setup skipped. You can add ROM files later by copying them to the appropriate system directories.", true);
@@ -1010,7 +1217,16 @@
             get
             {
                 var pathSystemName = !string.IsNullOrEmpty(RomPathSystemName) ? RomPathSystemName : SystemName;
-                return Path.Combine(ExtractedPath, "Roms", $"{pathSystemName} ({ SystemCode})");
+                return Path.Combine(ExtractedPath, "Roms", $"{pathSystemName} ({SystemCode})");
+            }
+        }
+
+        public string DevicePath
+        {
+            get
+            {
+                var pathSystemName = !string.IsNullOrEmpty(RomPathSystemName) ? RomPathSystemName : SystemName;
+                return $"{AdbFileOperations.NEXTUI_BASE_PATH}/Roms/{pathSystemName} ({SystemCode})";
             }
         }
     }

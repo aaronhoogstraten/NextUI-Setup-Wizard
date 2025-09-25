@@ -16,6 +16,11 @@ namespace NextUI_Setup_Wizard.Resources
         private readonly AdbService _adbService;
         private readonly string? _selectedDeviceId;
 
+        /// <summary>
+        /// Base path for NextUI on TrimUI devices
+        /// </summary>
+        public const string NEXTUI_BASE_PATH = "/mnt/SDCARD";
+
         public AdbFileOperations(AdbService adbService, string? deviceId = null)
         {
             _adbService = adbService ?? throw new ArgumentNullException(nameof(adbService));
@@ -28,7 +33,7 @@ namespace NextUI_Setup_Wizard.Resources
         /// </summary>
         public string GetNextUIBasePath()
         {
-            return "/mnt/SDCARD";
+            return NEXTUI_BASE_PATH;
         }
 
         /// <summary>
