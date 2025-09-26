@@ -17,6 +17,11 @@ namespace NextUI_Setup_Wizard.Resources
         private readonly string _adbExecutablePath;
         private readonly int _defaultTimeoutMs = 30000; // 30 seconds
 
+        /// <summary>
+        /// Event fired when an ADB command is executed for real-time logging
+        /// </summary>
+        public event EventHandler<AdbCommandLogEventArgs>? CommandExecuted;
+
         public AdbService(string adbExecutablePath)
         {
             _adbExecutablePath = adbExecutablePath ?? throw new ArgumentNullException(nameof(adbExecutablePath));
@@ -248,6 +253,20 @@ namespace NextUI_Setup_Wizard.Resources
             CancellationToken cancellationToken = default,
             int? timeout = null)
         {
+            var commandStartTime = DateTime.Now;
+            var fullCommand = $"adb {arguments}";
+
+            // Log command start
+            Logger.LogImmediate($"ADB Command Starting: {fullCommand}");
+
+            // Fire event for real-time UI updates
+            CommandExecuted?.Invoke(this, new AdbCommandLogEventArgs
+            {
+                Command = fullCommand,
+                StartTime = commandStartTime,
+                Status = AdbCommandStatus.Starting
+            });
+
             try
             {
                 using var process = new Process();
@@ -291,26 +310,84 @@ namespace NextUI_Setup_Wizard.Resources
                 process.WaitForExit(timeoutMs);
                 var completed = process.HasExited;
 
+                var executionTime = DateTime.Now - commandStartTime;
+
                 if (!completed)
                 {
                     process.Kill();
-                    return Task.FromResult(new AdbResult { IsSuccess = false, Error = "Command timed out" });
+                    var timeoutResult = new AdbResult { IsSuccess = false, Error = "Command timed out" };
+
+                    // Log timeout
+                    Logger.LogImmediate($"ADB Command Timeout: {fullCommand} (after {executionTime.TotalSeconds:F2}s)");
+
+                    // Fire timeout event
+                    CommandExecuted?.Invoke(this, new AdbCommandLogEventArgs
+                    {
+                        Command = fullCommand,
+                        StartTime = commandStartTime,
+                        EndTime = DateTime.Now,
+                        ExecutionTime = executionTime,
+                        Status = AdbCommandStatus.Timeout,
+                        Error = "Command timed out"
+                    });
+
+                    return Task.FromResult(timeoutResult);
                 }
 
                 var output = outputBuilder.ToString().Trim();
                 var error = errorBuilder.ToString().Trim();
+                var isSuccess = process.ExitCode == 0;
 
-                return Task.FromResult(new AdbResult
+                var result = new AdbResult
                 {
-                    IsSuccess = process.ExitCode == 0,
+                    IsSuccess = isSuccess,
                     Output = output,
                     Error = string.IsNullOrEmpty(error) ? null : error,
                     ExitCode = process.ExitCode
+                };
+
+                // Log command completion
+                var logMessage = isSuccess
+                    ? $"ADB Command Success: {fullCommand} (completed in {executionTime.TotalSeconds:F2}s){(!string.IsNullOrEmpty(output) ? $" - Output: {output}" : "")}"
+                    : $"ADB Command Failed: {fullCommand} (failed in {executionTime.TotalSeconds:F2}s) - Exit Code: {process.ExitCode}, Error: {error}";
+
+                Logger.LogImmediate(logMessage);
+
+                // Fire completion event
+                CommandExecuted?.Invoke(this, new AdbCommandLogEventArgs
+                {
+                    Command = fullCommand,
+                    StartTime = commandStartTime,
+                    EndTime = DateTime.Now,
+                    ExecutionTime = executionTime,
+                    Status = isSuccess ? AdbCommandStatus.Success : AdbCommandStatus.Failed,
+                    Output = output,
+                    Error = error,
+                    ExitCode = process.ExitCode
                 });
+
+                return Task.FromResult(result);
             }
             catch (Exception ex)
             {
-                return Task.FromResult(new AdbResult { IsSuccess = false, Error = ex.Message });
+                var executionTime = DateTime.Now - commandStartTime;
+                var exceptionResult = new AdbResult { IsSuccess = false, Error = ex.Message };
+
+                // Log exception
+                Logger.LogImmediate($"ADB Command Exception: {fullCommand} (failed in {executionTime.TotalSeconds:F2}s) - {ex.Message}");
+
+                // Fire exception event
+                CommandExecuted?.Invoke(this, new AdbCommandLogEventArgs
+                {
+                    Command = fullCommand,
+                    StartTime = commandStartTime,
+                    EndTime = DateTime.Now,
+                    ExecutionTime = executionTime,
+                    Status = AdbCommandStatus.Exception,
+                    Error = ex.Message
+                });
+
+                return Task.FromResult(exceptionResult);
             }
         }
 
@@ -399,5 +476,32 @@ namespace NextUI_Setup_Wizard.Resources
         public double AvailableGB => AvailableBytes / (1024.0 * 1024.0 * 1024.0);
 
         public double UsedPercentage => TotalBytes > 0 ? (UsedBytes * 100.0) / TotalBytes : 0;
+    }
+
+    /// <summary>
+    /// Event arguments for ADB command logging
+    /// </summary>
+    public class AdbCommandLogEventArgs : EventArgs
+    {
+        public string Command { get; set; } = "";
+        public DateTime StartTime { get; set; }
+        public DateTime? EndTime { get; set; }
+        public TimeSpan? ExecutionTime { get; set; }
+        public AdbCommandStatus Status { get; set; }
+        public string? Output { get; set; }
+        public string? Error { get; set; }
+        public int? ExitCode { get; set; }
+    }
+
+    /// <summary>
+    /// Status of an ADB command execution
+    /// </summary>
+    public enum AdbCommandStatus
+    {
+        Starting,
+        Success,
+        Failed,
+        Timeout,
+        Exception
     }
 }

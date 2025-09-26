@@ -1,0 +1,456 @@
+@using NextUI_Setup_Wizard.Resources
+@implements IDisposable
+
+@if (CommandLogger != null && CommandLogger.IsVisible)
+{
+    <div class="adb-command-window @(CommandLogger.IsExpanded ? "expanded" : "collapsed")">
+        <div class="adb-window-header">
+            <div class="adb-window-title">
+                <span class="adb-window-icon">🔧</span>
+                <span class="adb-window-text">ADB Commands</span>
+                <span class="adb-command-count">(@CommandLogger.CommandCount)</span>
+            </div>
+            <div class="adb-window-controls">
+                <button class="adb-control-btn" @onclick="ToggleExpanded" title="@(CommandLogger.IsExpanded ? "Collapse" : "Expand")">
+                    @(CommandLogger.IsExpanded ? "▼" : "▲")
+                </button>
+                <button class="adb-control-btn" @onclick="ClearHistory" title="Clear History">
+                    🗑️
+                </button>
+                <button class="adb-control-btn" @onclick="Hide" title="Hide Window">
+                    ✕
+                </button>
+            </div>
+        </div>
+
+        @if (CommandLogger.IsExpanded)
+        {
+            <div class="adb-window-content">
+                <div class="adb-commands-list" @ref="commandsListElement">
+                    @if (CommandLogger.CommandHistory.Any())
+                    {
+                        @foreach (var command in CommandLogger.CommandHistory.Reverse())
+                        {
+                            <div class="adb-command-entry @command.StatusCssClass">
+                                <div class="adb-command-header">
+                                    <div class="adb-command-time">@command.DisplayTime</div>
+                                    <div class="adb-command-status">@command.StatusDisplay</div>
+                                    <div class="adb-command-duration">@command.ExecutionTimeDisplay</div>
+                                </div>
+                                <div class="adb-command-text">
+                                    <code>@command.Command</code>
+                                </div>
+                                @if (!string.IsNullOrEmpty(command.Output))
+                                {
+                                    <div class="adb-command-output">
+                                        <div class="output-label">Output:</div>
+                                        <pre class="output-text">@command.Output</pre>
+                                    </div>
+                                }
+                                @if (!string.IsNullOrEmpty(command.Error))
+                                {
+                                    <div class="adb-command-error">
+                                        <div class="error-label">Error:</div>
+                                        <pre class="error-text">@command.Error</pre>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="adb-no-commands">
+                            <span>No ADB commands executed yet</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="adb-window-summary">
+                @if (CommandLogger.LatestCommand != null)
+                {
+                    <div class="adb-latest-command">
+                        <span class="latest-status @CommandLogger.LatestCommand.StatusCssClass">
+                            @CommandLogger.LatestCommand.StatusDisplay
+                        </span>
+                        <span class="latest-command-text">@GetShortCommand(CommandLogger.LatestCommand.Command)</span>
+                    </div>
+                }
+                else
+                {
+                    <span class="no-commands-text">Ready to execute ADB commands</span>
+                }
+            </div>
+        }
+    </div>
+}
+
+<style>
+    .adb-command-window {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        width: 500px;
+        max-height: 60vh;
+        background: #ffffff;
+        border: 1px solid #d0d7de;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        z-index: 1000;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        transition: all 0.3s ease;
+    }
+
+    .adb-command-window.collapsed {
+        max-height: 60px;
+    }
+
+    .adb-window-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        background: #f6f8fa;
+        border-bottom: 1px solid #d0d7de;
+        border-radius: 8px 8px 0 0;
+        cursor: pointer;
+    }
+
+    .adb-window-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        color: #24292e;
+        font-size: 14px;
+    }
+
+    .adb-window-icon {
+        font-size: 16px;
+    }
+
+    .adb-command-count {
+        color: #586069;
+        font-weight: 400;
+        font-size: 12px;
+    }
+
+    .adb-window-controls {
+        display: flex;
+        gap: 4px;
+    }
+
+    .adb-control-btn {
+        background: none;
+        border: none;
+        padding: 4px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        color: #586069;
+        font-size: 12px;
+        transition: all 0.2s;
+    }
+
+    .adb-control-btn:hover {
+        background: #e1e4e8;
+        color: #24292e;
+    }
+
+    .adb-window-content {
+        max-height: calc(60vh - 60px);
+        overflow-y: auto;
+    }
+
+    .adb-commands-list {
+        padding: 8px;
+    }
+
+    .adb-command-entry {
+        margin-bottom: 12px;
+        padding: 12px;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        background: #fff;
+        transition: border-color 0.2s;
+    }
+
+    .adb-command-entry.status-starting {
+        border-left: 4px solid #ffa500;
+        background: #fff8dc;
+    }
+
+    .adb-command-entry.status-success {
+        border-left: 4px solid #28a745;
+        background: #f0fff4;
+    }
+
+    .adb-command-entry.status-failed {
+        border-left: 4px solid #dc3545;
+        background: #fff5f5;
+    }
+
+    .adb-command-entry.status-timeout {
+        border-left: 4px solid #ffc107;
+        background: #fffbf0;
+    }
+
+    .adb-command-entry.status-exception {
+        border-left: 4px solid #e83e8c;
+        background: #fdf2f8;
+    }
+
+    .adb-command-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        font-size: 12px;
+    }
+
+    .adb-command-time {
+        color: #586069;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+    }
+
+    .adb-command-status {
+        font-weight: 600;
+        font-size: 11px;
+    }
+
+    .adb-command-duration {
+        color: #586069;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+    }
+
+    .adb-command-text {
+        margin-bottom: 8px;
+    }
+
+    .adb-command-text code {
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 13px;
+        color: #24292e;
+        background: #f6f8fa;
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 1px solid #e1e4e8;
+        word-break: break-all;
+        white-space: pre-wrap;
+    }
+
+    .adb-command-output,
+    .adb-command-error {
+        margin-top: 8px;
+    }
+
+    .output-label,
+    .error-label {
+        font-size: 11px;
+        font-weight: 600;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .output-label {
+        color: #28a745;
+    }
+
+    .error-label {
+        color: #dc3545;
+    }
+
+    .output-text,
+    .error-text {
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        font-size: 11px;
+        margin: 0;
+        padding: 8px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 100px;
+        overflow-y: auto;
+    }
+
+    .output-text {
+        background: #f0fff4;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+    }
+
+    .error-text {
+        background: #fff5f5;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
+    }
+
+    .adb-no-commands {
+        text-align: center;
+        padding: 24px;
+        color: #586069;
+        font-style: italic;
+    }
+
+    .adb-window-summary {
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-radius: 0 0 8px 8px;
+    }
+
+    .adb-latest-command {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+    }
+
+    .latest-status {
+        font-weight: 600;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 10px;
+    }
+
+    .latest-status.status-starting {
+        background: #ffa500;
+        color: white;
+    }
+
+    .latest-status.status-success {
+        background: #28a745;
+        color: white;
+    }
+
+    .latest-status.status-failed {
+        background: #dc3545;
+        color: white;
+    }
+
+    .latest-status.status-timeout {
+        background: #ffc107;
+        color: #212529;
+    }
+
+    .latest-status.status-exception {
+        background: #e83e8c;
+        color: white;
+    }
+
+    .latest-command-text {
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        color: #586069;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+    }
+
+    .no-commands-text {
+        color: #586069;
+        font-style: italic;
+        font-size: 12px;
+    }
+
+    /* Responsive adjustments */
+    @@media (max-width: 768px) {
+        .adb-command-window {
+            width: calc(100vw - 40px);
+            right: 20px;
+            left: 20px;
+        }
+
+        .adb-command-header {
+            flex-direction: column;
+            gap: 4px;
+            align-items: flex-start;
+        }
+
+        .adb-command-text code {
+            font-size: 11px;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public AdbCommandLogger? CommandLogger { get; set; }
+
+    private ElementReference commandsListElement;
+
+    protected override void OnInitialized()
+    {
+        if (CommandLogger != null)
+        {
+            CommandLogger.CommandAdded += OnCommandAdded;
+            CommandLogger.PropertyChanged += OnPropertyChanged;
+        }
+    }
+
+    private async void OnCommandAdded(object? sender, AdbCommandLogEntry command)
+    {
+        await InvokeAsync(() =>
+        {
+            StateHasChanged();
+            // Auto-scroll to top for new commands
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(100); // Small delay to ensure DOM is updated
+                await InvokeAsync(async () =>
+                {
+                    try
+                    {
+                        if (commandsListElement.Id != null)
+                        {
+                            await commandsListElement.FocusAsync();
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore focus errors
+                    }
+                });
+            });
+        });
+    }
+
+    private async void OnPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleExpanded()
+    {
+        CommandLogger?.ToggleExpanded();
+    }
+
+    private void ClearHistory()
+    {
+        CommandLogger?.ClearHistory();
+    }
+
+    private void Hide()
+    {
+        CommandLogger?.Hide();
+    }
+
+    private string GetShortCommand(string fullCommand)
+    {
+        // Extract just the main command part for display in collapsed mode
+        const int maxLength = 40;
+        if (fullCommand.Length <= maxLength)
+            return fullCommand;
+
+        return fullCommand.Substring(0, maxLength - 3) + "...";
+    }
+
+    public void Dispose()
+    {
+        if (CommandLogger != null)
+        {
+            CommandLogger.CommandAdded -= OnCommandAdded;
+            CommandLogger.PropertyChanged -= OnPropertyChanged;
+        }
+    }
+}

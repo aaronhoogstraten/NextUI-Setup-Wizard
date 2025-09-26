@@ -3,8 +3,16 @@
 @using Microsoft.Maui.Storage
 @using NextUI_Setup_Wizard.Resources
 @using static NextUI_Setup_Wizard.Resources.Utils
+@using NextUI_Setup_Wizard.Components.Shared
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
+@implements IDisposable
+
+<!-- ADB Command Window -->
+<AdbCommandWindow CommandLogger="@adbCommandLogger" />
+
+<!-- Floating ADB Log Button -->
+<AdbLogButton CommandLogger="@adbCommandLogger" IsAdbMode="true" />
 
 <div class="compact-container">
     <h3 data-ref="page-header">ADB Configuration</h3>
@@ -564,6 +572,7 @@
     private PlatformToolsExtractor? platformToolsExtractor;
     private AdbService? adbService;
     private AdbFileOperations? adbFileOps;
+    private AdbCommandLogger adbCommandLogger = new();
 
     private string selectedPlatformToolsPath = "";
     private bool isSelectingFile = false;
@@ -615,7 +624,16 @@
     {
         if (platformToolsExtractor != null && platformToolsExtractor.IsAdbAvailable())
         {
+            // Unsubscribe from old service if exists
+            if (adbService != null)
+            {
+                adbCommandLogger.UnsubscribeFromAdbService(adbService);
+            }
+
             adbService = new AdbService(platformToolsExtractor.AdbExecutablePath);
+
+            // Subscribe to command logging
+            adbCommandLogger.SubscribeToAdbService(adbService);
         }
     }
 
@@ -832,6 +850,15 @@
         {
             statusMessage = "";
             StateHasChanged();
+        }
+    }
+
+    public void Dispose()
+    {
+        // Clean up ADB command logger subscription
+        if (adbService != null)
+        {
+            adbCommandLogger?.UnsubscribeFromAdbService(adbService);
         }
     }
 }
