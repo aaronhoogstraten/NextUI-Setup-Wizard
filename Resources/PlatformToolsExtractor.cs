@@ -15,7 +15,7 @@ namespace NextUI_Setup_Wizard.Resources
 
         public PlatformToolsExtractor()
         {
-            _extractionPath = Path.Combine(FileSystem.AppDataDirectory, "platform-tools");
+            _extractionPath = Path.Combine(FileSystem.CacheDirectory, "platform-tools");
         }
 
         /// <summary>

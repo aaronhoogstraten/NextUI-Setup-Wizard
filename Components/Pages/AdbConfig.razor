@@ -8,27 +8,16 @@
 
 <div class="compact-container">
     <h3 data-ref="page-header">ADB Configuration</h3>
-    <p class="intro-text">Configure Android Debug Bridge (ADB) to transfer files directly to your emulation device without removing the SD card. <strong>Note:</strong> NextUI should already be installed on your device before using this method.</p>
+    <p class="intro-text">Configure Android Debug Bridge (ADB) to transfer files directly to your emulation device without removing the SD card.<br><strong>Note:</strong> NextUI should already be installed on your device before using this method.</p>
 
+    <div class="warning-message">
+        <span class="warning-icon">⚠️</span>
+        <strong>Warning:</strong> ADB Mode is intended for advanced users. Performing ADB operations directly on the device carries risk and it is highly recommended to make a backup of your SD card before using ADB Mode.
+    </div>
 
     <div class="setup-steps">
         <div class="step-section">
-            <h4 class="step-title">📱 Step 1: Enable Developer Options on Your Device</h4>
-            <div class="step-content">
-                <p>Before using ADB, you must enable Developer Options and USB Debugging on your emulation device:</p>
-                <ol>
-                    <li>Go to <strong>Settings</strong> → <strong>About</strong> (or <strong>About Device</strong>)</li>
-                    <li>Tap <strong>Build Number</strong> 7 times until you see "You are now a developer"</li>
-                    <li>Go back to <strong>Settings</strong> → <strong>Developer Options</strong></li>
-                    <li>Enable <strong>USB Debugging</strong></li>
-                    <li>Connect your device to this computer via USB cable</li>
-                    <li>If prompted on your device, allow USB debugging for this computer</li>
-                </ol>
-            </div>
-        </div>
-
-        <div class="step-section">
-            <h4 class="step-title">🔧 Step 2: Install Android Platform Tools</h4>
+            <h4 class="step-title">🔧 Step 1: Install Android Platform Tools</h4>
             <div class="step-content">
                 <p>Select the Android Platform Tools zip file that you downloaded from the Android Developer website:</p>
 
@@ -93,7 +82,7 @@
         </div>
 
         <div class="step-section">
-            <h4 class="step-title">📱 Step 3: Connect Device & Verify Installation</h4>
+            <h4 class="step-title">📱 Step 2: Connect Device & Verify Installation</h4>
             <div class="step-content">
                 <p>Connect to your emulation device and verify that NextUI is properly installed:</p>
 
@@ -215,8 +204,26 @@
 
     .intro-text {
         color: #586069;
-        margin-bottom: 30px;
+        margin-bottom: 20px;
         font-size: 1.1em;
+    }
+
+    .warning-message {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 30px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        color: #856404;
+    }
+
+    .warning-icon {
+        font-size: 18px;
+        flex-shrink: 0;
+        margin-top: 2px;
     }
 
     .setup-steps {
