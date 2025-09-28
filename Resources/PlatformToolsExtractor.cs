@@ -53,6 +53,49 @@ namespace NextUI_Setup_Wizard.Resources
         }
 
         /// <summary>
+        /// Attempts to auto-detect platform-tools installations (e.g., Homebrew on macOS)
+        /// </summary>
+        /// <returns>True if a valid installation was found and set, false otherwise</returns>
+        public bool TryAutoDetectExistingInstallation()
+        {
+            try
+            {
+                // Check for Homebrew installation on macOS (Apple Silicon only)
+                if (Utils.CurrentOS == OSType.Mac)
+                {
+                    var basePath = "/opt/homebrew/Caskroom/android-platform-tools";
+
+                    if (Directory.Exists(basePath))
+                    {
+                        // Scan for version subdirectories
+                        var versionDirs = Directory.GetDirectories(basePath);
+                        foreach (var versionDir in versionDirs)
+                        {
+                            var platformToolsPath = Path.Combine(versionDir, "platform-tools");
+                            if (Directory.Exists(platformToolsPath))
+                            {
+                                var adbPath = Path.Combine(platformToolsPath, "adb");
+                                if (File.Exists(adbPath))
+                                {
+                                    _extractionPath = platformToolsPath;
+                                    _usingExistingPath = true;
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Could add other auto-detection logic here for different platforms/package managers
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Sets the path to an existing platform-tools installation
         /// </summary>
         /// <param name="existingPath">Path to existing platform-tools directory</param>

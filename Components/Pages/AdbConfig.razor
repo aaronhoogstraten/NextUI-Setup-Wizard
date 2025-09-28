@@ -748,6 +748,16 @@
     {
         platformToolsExtractor = new PlatformToolsExtractor();
 
+        // Try to auto-detect existing installations (e.g., Homebrew on macOS)
+        if (!platformToolsExtractor.IsAdbAvailable())
+        {
+            if (platformToolsExtractor.TryAutoDetectExistingInstallation())
+            {
+                useExistingPath = true;
+                await SetStatusMessage($"Auto-detected platform-tools installation at: {platformToolsExtractor.ExtractionPath}", true);
+            }
+        }
+
         if (platformToolsExtractor.IsAdbAvailable())
         {
             InitializeAdbService();
