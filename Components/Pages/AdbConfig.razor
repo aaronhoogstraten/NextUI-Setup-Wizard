@@ -1,6 +1,7 @@
 @page "/adb-config"
 @using System.IO
 @using Microsoft.Maui.Storage
+@using CommunityToolkit.Maui.Storage
 @using NextUI_Setup_Wizard.Resources
 @using static NextUI_Setup_Wizard.Resources.Utils
 @using NextUI_Setup_Wizard.Components.Shared
@@ -27,48 +28,115 @@
         <div class="step-section">
             <h4 class="step-title">🔧 Step 1: Install Android Platform Tools</h4>
             <div class="step-content">
-                <p>Select the Android Platform Tools zip file that you downloaded from the Android Developer website:</p>
+                <p>Choose one of the following options to set up Android Platform Tools:</p>
 
-                <div class="platform-tools-section">
-                    @if (!string.IsNullOrEmpty(selectedPlatformToolsPath))
+                <div class="platform-tools-options">
+                    <div class="option-tabs">
+                        <button class="tab-button @(useExistingPath ? "" : "active")" @onclick="() => SwitchToZipMode()">
+                            📦 Download & Extract ZIP
+                        </button>
+                        <button class="tab-button @(useExistingPath ? "active" : "")" @onclick="() => SwitchToExistingPath()">
+                            📁 Use Existing Installation
+                        </button>
+                    </div>
+
+                    @if (!useExistingPath)
                     {
-                        <div class="selected-file-info">
-                            <span class="file-icon">📦</span>
-                            <span class="file-name">@Path.GetFileName(selectedPlatformToolsPath)</span>
-                            <button class="btn btn-sm btn-secondary" @onclick="ClearPlatformToolsSelection">Clear</button>
+                        <div class="option-content">
+                            <p class="option-description">Select the Android Platform Tools zip file that you downloaded from the <a href="https://developer.android.com/tools/releases/platform-tools#downloads" target="_blank" class="external-link">Android Developer website</a>:</p>
+
+                            <div class="platform-tools-section">
+                                @if (!string.IsNullOrEmpty(selectedPlatformToolsPath))
+                                {
+                                    <div class="selected-file-info">
+                                        <span class="file-icon">📦</span>
+                                        <span class="file-name">@Path.GetFileName(selectedPlatformToolsPath)</span>
+                                        <button class="btn btn-sm btn-secondary" @onclick="ClearPlatformToolsSelection">Clear</button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="no-file-selected">
+                                        <span class="status-icon">○</span>
+                                        <span>No platform-tools zip file selected</span>
+                                    </div>
+                                }
+
+                                <button class="btn btn-primary" @onclick="SelectPlatformToolsZip" disabled="@isSelectingFile">
+                                    @if (isSelectingFile)
+                                    {
+                                        <span>Selecting...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Select Platform Tools ZIP</span>
+                                    }
+                                </button>
+
+                                @if (!string.IsNullOrEmpty(selectedPlatformToolsPath))
+                                {
+                                    <button class="btn btn-success" @onclick="ExtractPlatformTools" disabled="@isExtracting">
+                                        @if (isExtracting)
+                                        {
+                                            <span>@extractProgress</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Extract Platform Tools</span>
+                                        }
+                                    </button>
+                                }
+                            </div>
                         </div>
                     }
                     else
                     {
-                        <div class="no-file-selected">
-                            <span class="status-icon">○</span>
-                            <span>No platform-tools zip file selected</span>
+                        <div class="option-content">
+                            <p class="option-description">Select the directory containing your existing platform-tools installation (should contain adb.exe or adb):</p>
+
+                            <div class="existing-path-section">
+                                @if (!string.IsNullOrEmpty(existingPlatformToolsPath))
+                                {
+                                    <div class="selected-path-info">
+                                        <span class="file-icon">📁</span>
+                                        <span class="path-name">@existingPlatformToolsPath</span>
+                                        <button class="btn btn-sm btn-secondary" @onclick="ClearExistingPath">Clear</button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="no-path-selected">
+                                        <span class="status-icon">○</span>
+                                        <span>No platform-tools directory selected</span>
+                                    </div>
+                                }
+
+                                <button class="btn btn-primary" @onclick="SelectExistingPlatformToolsPath" disabled="@isSelectingPath">
+                                    @if (isSelectingPath)
+                                    {
+                                        <span>Selecting...</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Select Platform Tools Directory</span>
+                                    }
+                                </button>
+
+                                @if (!string.IsNullOrEmpty(existingPlatformToolsPath))
+                                {
+                                    <button class="btn btn-success" @onclick="ValidateExistingPath" disabled="@isValidatingPath">
+                                        @if (isValidatingPath)
+                                        {
+                                            <span>Validating...</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Validate Installation</span>
+                                        }
+                                    </button>
+                                }
+                            </div>
                         </div>
-                    }
-
-                    <button class="btn btn-primary" @onclick="SelectPlatformToolsZip" disabled="@isSelectingFile">
-                        @if (isSelectingFile)
-                        {
-                            <span>Selecting...</span>
-                        }
-                        else
-                        {
-                            <span>Select Platform Tools ZIP</span>
-                        }
-                    </button>
-
-                    @if (!string.IsNullOrEmpty(selectedPlatformToolsPath))
-                    {
-                        <button class="btn btn-success" @onclick="ExtractPlatformTools" disabled="@isExtracting">
-                            @if (isExtracting)
-                            {
-                                <span>@extractProgress</span>
-                            }
-                            else
-                            {
-                                <span>Extract Platform Tools</span>
-                            }
-                        </button>
                     }
                 </div>
 
@@ -92,7 +160,7 @@
         <div class="step-section">
             <h4 class="step-title">📱 Step 2: Connect Device & Verify Installation</h4>
             <div class="step-content">
-                <p>Connect to your emulation device and verify that NextUI is properly installed:</p>
+                <p>Connect to your emulation device (powered on and screen on) and verify that NextUI is properly installed:</p>
 
                 <div class="device-section">
                     <button class="btn btn-info" @onclick="RefreshDevices" disabled="@isRefreshingDevices">
@@ -273,12 +341,88 @@
         color: #586069;
     }
 
-    .platform-tools-section, .device-section {
+    .platform-tools-options {
         background: white;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        margin: 15px 0;
+        overflow: hidden;
+    }
+
+    .option-tabs {
+        display: flex;
+        background: #f6f8fa;
+        border-bottom: 1px solid #e1e4e8;
+    }
+
+    .tab-button {
+        flex: 1;
+        padding: 12px 16px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        color: #586069;
+        transition: all 0.2s;
+    }
+
+    .tab-button:hover {
+        background: #e1e4e8;
+        color: #24292e;
+    }
+
+    .tab-button.active {
+        background: white;
+        color: #0366d6;
+        border-bottom: 2px solid #0366d6;
+        font-weight: 600;
+    }
+
+    .option-content {
+        padding: 20px;
+    }
+
+    .option-description {
+        color: #586069;
+        margin-bottom: 15px;
+        font-size: 0.95em;
+    }
+
+    .external-link {
+        color: #0366d6;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .external-link:hover {
+        text-decoration: underline;
+    }
+
+    .platform-tools-section, .existing-path-section, .device-section {
+        background: #f8f9fa;
         border: 1px solid #e1e4e8;
         border-radius: 6px;
         padding: 15px;
         margin: 15px 0;
+    }
+
+    .selected-path-info, .no-path-selected {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 15px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+
+    .path-name {
+        flex: 1;
+        font-family: 'SFMono-Regular', Consolas, monospace;
+        color: #24292e;
+        font-size: 0.9em;
+        word-break: break-all;
     }
 
     .selected-file-info, .no-file-selected {
@@ -580,6 +724,12 @@
     private string extractProgress = "";
     private string extractStatus = "";
 
+    // Existing path mode variables
+    private bool useExistingPath = false;
+    private string existingPlatformToolsPath = "";
+    private bool isSelectingPath = false;
+    private bool isValidatingPath = false;
+
     private List<AdbDevice> adbDevices = new();
     private AdbDevice? selectedDevice;
     private DeviceStorageInfo? deviceStorage;
@@ -682,6 +832,95 @@
     {
         selectedPlatformToolsPath = "";
         StateHasChanged();
+    }
+
+    private void SwitchToZipMode()
+    {
+        useExistingPath = false;
+        ClearExistingPath();
+        StateHasChanged();
+    }
+
+    private void SwitchToExistingPath()
+    {
+        useExistingPath = true;
+        ClearPlatformToolsSelection();
+        StateHasChanged();
+    }
+
+    private void ClearExistingPath()
+    {
+        existingPlatformToolsPath = "";
+        StateHasChanged();
+    }
+
+    private async Task SelectExistingPlatformToolsPath()
+    {
+        try
+        {
+            isSelectingPath = true;
+            StateHasChanged();
+
+            var folderResult = await FolderPicker.Default.PickAsync(CancellationToken.None);
+            if (folderResult != null && folderResult.IsSuccessful)
+            {
+                existingPlatformToolsPath = folderResult.Folder.Path;
+                await SetStatusMessage($"Selected platform-tools directory: {existingPlatformToolsPath}", true);
+            }
+        }
+        catch (Exception ex)
+        {
+            await SetStatusMessage($"Error selecting directory: {ex.Message}", false);
+        }
+        finally
+        {
+            isSelectingPath = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ValidateExistingPath()
+    {
+        if (string.IsNullOrEmpty(existingPlatformToolsPath))
+            return;
+
+        try
+        {
+            isValidatingPath = true;
+            StateHasChanged();
+
+            // Check if the directory contains adb executable
+            var adbExecutable = Utils.CurrentOS == OSType.Windows ? "adb.exe" : "adb";
+            var adbPath = Path.Combine(existingPlatformToolsPath, adbExecutable);
+
+            if (!File.Exists(adbPath))
+            {
+                await SetStatusMessage($"ADB executable not found in the selected directory. Expected: {adbPath}", false);
+                return;
+            }
+
+            // Create a new PlatformToolsExtractor with the existing path
+            platformToolsExtractor = new PlatformToolsExtractor();
+            if (platformToolsExtractor.SetExistingPath(existingPlatformToolsPath))
+            {
+                InitializeAdbService();
+                await SetStatusMessage("Existing platform-tools installation validated successfully!", true);
+                await RefreshDevices();
+            }
+            else
+            {
+                await SetStatusMessage("Failed to validate the existing platform-tools installation.", false);
+            }
+        }
+        catch (Exception ex)
+        {
+            await SetStatusMessage($"Error validating platform-tools path: {ex.Message}", false);
+        }
+        finally
+        {
+            isValidatingPath = false;
+            StateHasChanged();
+        }
     }
 
     private async Task ExtractPlatformTools()

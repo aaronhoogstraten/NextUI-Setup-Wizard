@@ -11,7 +11,8 @@ namespace NextUI_Setup_Wizard.Resources
     /// </summary>
     public class PlatformToolsExtractor
     {
-        private readonly string _extractionPath;
+        private string _extractionPath;
+        private bool _usingExistingPath = false;
 
         public PlatformToolsExtractor()
         {
@@ -31,7 +32,14 @@ namespace NextUI_Setup_Wizard.Resources
             get
             {
                 var adbName = Utils.CurrentOS == OSType.Windows ? "adb.exe" : "adb";
-                return Path.Combine(_extractionPath, "platform-tools", adbName);
+                if (_usingExistingPath)
+                {
+                    return Path.Combine(_extractionPath, adbName);
+                }
+                else
+                {
+                    return Path.Combine(_extractionPath, "platform-tools", adbName);
+                }
             }
         }
 
@@ -42,6 +50,34 @@ namespace NextUI_Setup_Wizard.Resources
         public bool IsAdbAvailable()
         {
             return File.Exists(AdbExecutablePath);
+        }
+
+        /// <summary>
+        /// Sets the path to an existing platform-tools installation
+        /// </summary>
+        /// <param name="existingPath">Path to existing platform-tools directory</param>
+        /// <returns>True if the path is valid and contains ADB, false otherwise</returns>
+        public bool SetExistingPath(string existingPath)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(existingPath) || !Directory.Exists(existingPath))
+                    return false;
+
+                var adbName = Utils.CurrentOS == OSType.Windows ? "adb.exe" : "adb";
+                var adbPath = Path.Combine(existingPath, adbName);
+
+                if (!File.Exists(adbPath))
+                    return false;
+
+                _extractionPath = existingPath;
+                _usingExistingPath = true;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         /// <summary>
