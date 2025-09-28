@@ -1023,6 +1023,9 @@
 
         await SetStatusMessage($"Selected device: {device.DisplayName}", true);
         StateHasChanged();
+
+        // Automatically verify the installation after device selection
+        await VerifyDeviceDirectories();
     }
 
     private async Task VerifyDeviceDirectories()

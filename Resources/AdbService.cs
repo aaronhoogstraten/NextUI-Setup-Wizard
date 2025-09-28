@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -184,7 +185,9 @@ namespace NextUI_Setup_Wizard.Resources
             try
             {
                 var deviceArg = !string.IsNullOrEmpty(deviceId) ? $"-s {deviceId}" : "";
-                var command = $"{deviceArg} shell test -e \"{remotePath}\" && echo \"EXISTS\" || echo \"NOT_EXISTS\"".Trim();
+                // Escape special characters in the path for shell
+                var escapedPath = remotePath.Replace("(", "\\(").Replace(")", "\\)");
+                var command = $"{deviceArg} shell test -e \"{escapedPath}\" && echo \"EXISTS\" || echo \"NOT_EXISTS\"".Trim();
 
                 var result = await ExecuteAdbCommandAsync(command);
                 return result.IsSuccess && result.Output.Contains("EXISTS");
@@ -204,7 +207,7 @@ namespace NextUI_Setup_Wizard.Resources
             try
             {
                 var deviceArg = !string.IsNullOrEmpty(deviceId) ? $"-s {deviceId}" : "";
-                var command = $"{deviceArg} shell df /sdcard".Trim();
+                var command = $"{deviceArg} shell df {AdbFileOperations.NEXTUI_BASE_PATH}".Trim();
 
                 var result = await ExecuteAdbCommandAsync(command);
                 if (!result.IsSuccess)
@@ -215,7 +218,7 @@ namespace NextUI_Setup_Wizard.Resources
                 if (lines.Length < 2)
                     return null;
 
-                var dataLine = lines.LastOrDefault(l => l.Contains("/sdcard") || l.Contains("storage") || !l.StartsWith("Filesystem"));
+                var dataLine = lines.LastOrDefault(l => l.Contains(AdbFileOperations.NEXTUI_BASE_PATH) || l.Contains("storage") || !l.StartsWith("Filesystem"));
                 if (string.IsNullOrEmpty(dataLine))
                     return null;
 
@@ -421,6 +424,135 @@ namespace NextUI_Setup_Wizard.Resources
                             break;
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Gets the SHA1 hash of a remote file via ADB
+        /// For systems without hash utilities (like Tina Linux), pulls file temporarily and computes hash locally
+        /// </summary>
+        /// <param name="remotePath">Remote path to the file</param>
+        /// <param name="deviceId">Optional device ID if multiple devices</param>
+        /// <returns>SHA1 hash string or null if failed</returns>
+        public async Task<string?> GetRemoteFileSha1Async(string remotePath, string? deviceId = null)
+        {
+            try
+            {
+                var deviceArg = !string.IsNullOrEmpty(deviceId) ? $"-s {deviceId}" : "";
+
+                // Try different hash commands available on some Linux systems
+                string[] hashCommands = {
+                    $"shell sha1sum \"{remotePath}\"",
+                    $"shell openssl dgst -sha1 \"{remotePath}\"",
+                    $"shell busybox sha1sum \"{remotePath}\"",
+                    $"shell toybox sha1sum \"{remotePath}\""
+                };
+
+                foreach (var hashCmd in hashCommands)
+                {
+                    var command = $"{deviceArg} {hashCmd}".Trim();
+                    var result = await ExecuteAdbCommandAsync(command);
+
+                    if (result.IsSuccess && !string.IsNullOrEmpty(result.Output) &&
+                        !result.Output.Contains("not found") && !result.Output.Contains("No such file"))
+                    {
+                        // Handle different output formats
+                        if (hashCmd.Contains("openssl"))
+                        {
+                            // openssl output format: "SHA1(filename)= hash"
+                            var match = System.Text.RegularExpressions.Regex.Match(result.Output, @"SHA1\([^)]+\)=\s*([a-fA-F0-9]+)");
+                            if (match.Success)
+                            {
+                                return match.Groups[1].Value.Trim().ToLowerInvariant();
+                            }
+                        }
+                        else
+                        {
+                            // sha1sum output format: "hash  filename"
+                            var parts = result.Output.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length > 0 && System.Text.RegularExpressions.Regex.IsMatch(parts[0], @"^[a-fA-F0-9]{40}$"))
+                            {
+                                return parts[0].Trim().ToLowerInvariant();
+                            }
+                        }
+                    }
+                }
+
+                // Fallback: Pull file temporarily and compute hash locally
+                // This works for systems like Tina Linux that lack hash utilities
+                return await GetRemoteFileSha1ByPullAsync(remotePath, deviceId);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Gets SHA1 hash by temporarily pulling the remote file and computing hash locally
+        /// </summary>
+        private async Task<string?> GetRemoteFileSha1ByPullAsync(string remotePath, string? deviceId = null)
+        {
+            string? tempFilePath = null;
+            try
+            {
+                // Create temporary file
+                tempFilePath = Path.Combine(Path.GetTempPath(), $"bios_hash_check_{Guid.NewGuid():N}.tmp");
+
+                // Pull file from device
+                var deviceArg = !string.IsNullOrEmpty(deviceId) ? $"-s {deviceId}" : "";
+                var pullCommand = $"{deviceArg} pull \"{remotePath}\" \"{tempFilePath}\"".Trim();
+                var pullResult = await ExecuteAdbCommandAsync(pullCommand);
+
+                if (pullResult.IsSuccess && File.Exists(tempFilePath))
+                {
+                    // Compute hash of temporary file
+                    return await GetLocalFileSha1Async(tempFilePath);
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+            finally
+            {
+                // Clean up temporary file
+                if (!string.IsNullOrEmpty(tempFilePath) && File.Exists(tempFilePath))
+                {
+                    try
+                    {
+                        File.Delete(tempFilePath);
+                    }
+                    catch
+                    {
+                        // Ignore cleanup failures
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Computes SHA1 hash for a local file
+        /// </summary>
+        /// <param name="filePath">Path to local file</param>
+        /// <returns>SHA1 hash string or null if failed</returns>
+        public static async Task<string?> GetLocalFileSha1Async(string filePath)
+        {
+            try
+            {
+                if (!File.Exists(filePath))
+                    return null;
+
+                using var sha1 = SHA1.Create();
+                using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
+                var hashBytes = await Task.Run(() => sha1.ComputeHash(fileStream));
+                return Convert.ToHexString(hashBytes).ToLowerInvariant();
+            }
+            catch
+            {
+                return null;
             }
         }
     }

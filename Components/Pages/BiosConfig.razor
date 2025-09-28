@@ -91,11 +91,26 @@
                                     @{
                                         var representativeBios = biosGroup.First();
                                         var isSelected = !string.IsNullOrEmpty(representativeBios.SelectedPath);
+                                        var existsOnTarget = representativeBios.ExistsOnTarget;
+                                        var isValidHash = representativeBios.IsValidHash;
                                     }
 
-                                    @if (isSelected)
-                                    {
-                                        <div class="file-status">
+                                    <div class="file-status">
+                                        @if (existsOnTarget)
+                                        {
+                                            @if (isValidHash)
+                                            {
+                                                <span class="status-icon existing-valid">✓</span>
+                                                <span class="existing-valid-text">Valid BIOS file exists</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="status-icon existing-invalid">✗</span>
+                                                <span class="existing-invalid-text">Invalid BIOS file exists (SHA1 mismatch)</span>
+                                            }
+                                        }
+                                        else if (isSelected)
+                                        {
                                             <span class="status-icon selected">✓</span>
                                             <span class="selected-path" title="@representativeBios.SelectedPath">
                                                 @Path.GetFileName(representativeBios.SelectedPath)
@@ -103,26 +118,34 @@
                                             <button class="btn btn-sm btn-secondary" @onclick="() => ClearGroupSelection(biosGroup)">
                                                 Clear
                                             </button>
-                                        </div>
-                                    }
-                                    else
-                                    {
-                                        <div class="file-status">
-                                            <span class="status-icon missing">○</span>
-                                            <span class="missing-text">Not selected</span>
-                                        </div>
-                                    }
-
-                                    <button class="btn btn-primary" @onclick="() => SelectBiosFile(biosGroup)" disabled="@isSelectingFile">
-                                        @if (isSelectingFile && currentSelectingFile == representativeBios.FileName)
-                                        {
-                                            <span>Selecting...</span>
                                         }
                                         else
                                         {
-                                            <span>Select File</span>
+                                            <span class="status-icon missing">○</span>
+                                            <span class="missing-text">Not selected</span>
                                         }
-                                    </button>
+                                    </div>
+
+                                    @if (!existsOnTarget || !isValidHash)
+                                    {
+                                        @if (isCheckingExistingFiles)
+                                        {
+                                            <span class="checking-status">Checking for existing BIOS file...</span>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-primary" @onclick="() => SelectBiosFile(biosGroup)" disabled="@isSelectingFile">
+                                                @if (isSelectingFile && currentSelectingFile == representativeBios.FileName)
+                                                {
+                                                    <span>Selecting...</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>@(existsOnTarget && !isValidHash ? "Replace Invalid File" : "Select File")</span>
+                                                }
+                                            </button>
+                                        }
+                                    }
                                 </div>
                             </div>
                         </div>
@@ -135,9 +158,17 @@
     <div class="summary-section">
         <div class="summary-stats">
             <p>
-                <strong>Files Selected:</strong> @selectedFilesCount of @totalFilesCount
-                (@(selectedFilesCount == totalFilesCount ? "Complete" : $"{totalFilesCount - selectedFilesCount} missing"))
+                <strong>BIOS Status:</strong> @completedFilesCount of @totalFilesCount complete
+                (@(completedFilesCount == totalFilesCount ? "All BIOS files ready" : $"{totalFilesCount - completedFilesCount} missing"))
             </p>
+            @if (existingValidFilesCount > 0)
+            {
+                <p><strong>Existing Valid Files:</strong> @existingValidFilesCount</p>
+            }
+            @if (selectedFilesCount > 0)
+            {
+                <p><strong>Selected for Copy:</strong> @selectedFilesCount</p>
+            }
         </div>
 
         <div class="action-buttons">
@@ -152,7 +183,7 @@
                     <span>@(isAdbMode ? $"Transfer to Device ({selectedFilesCount})" : $"Copy Selected Files ({selectedFilesCount})")</span>
                 }
             </button>
-            <button class="btn btn-info" @onclick="SkipBiosSetup">@((isAdbMode ? hasSuccessfullyTransferredFiles : hasSuccessfullyCopiedFiles) ? "Continue to ROM Setup" : "Skip BIOS Setup")</button>
+            <button class="btn btn-info" @onclick="SkipBiosSetup">@((isAdbMode ? hasSuccessfullyTransferredFiles : hasSuccessfullyCopiedFiles) || completedFilesCount == totalFilesCount ? "Continue to ROM Setup" : "Skip BIOS Setup")</button>
         </div>
     </div>
 
@@ -332,6 +363,16 @@
             border: 2px solid #d0d7de;
         }
 
+        .status-icon.existing-valid {
+            background: #28a745;
+            color: white;
+        }
+
+        .status-icon.existing-invalid {
+            background: #dc3545;
+            color: white;
+        }
+
     .selected-path {
         color: #28a745;
         font-family: 'SFMono-Regular', Consolas, monospace;
@@ -345,6 +386,27 @@
     .missing-text {
         color: #d73a49;
         font-size: 0.9em;
+    }
+
+    .existing-valid-text {
+        color: #28a745;
+        font-size: 0.9em;
+        font-weight: 500;
+    }
+
+    .existing-invalid-text {
+        color: #dc3545;
+        font-size: 0.9em;
+        font-weight: 500;
+    }
+
+    .checking-status {
+        color: #6c757d;
+        font-size: 0.9em;
+        font-style: italic;
+        display: flex;
+        align-items: center;
+        min-height: 38px; /* Match button height */
     }
 
     .btn {
@@ -592,9 +654,12 @@
     private string statusMessage = "";
     private bool isSuccess = false;
     private bool hasSuccessfullyCopiedFiles = false;
+    private bool isCheckingExistingFiles = false;
 
     private int selectedFilesCount => GetUniqueSelectedFiles().Count();
+    private int existingValidFilesCount => GetUniqueExistingValidFiles().Count();
     private int totalFilesCount => GetUniqueFileNames().Count();
+    private int completedFilesCount => selectedFilesCount + existingValidFilesCount;
 
     private List<BiosSystem> biosSystems = new();
 
@@ -652,6 +717,9 @@
         }
 
         InitializeBiosSystems();
+
+        // Check for existing BIOS files after initialization
+        await CheckExistingBiosFiles();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -822,11 +890,65 @@
                         FileName = "neogeo.zip",
                         SystemCode = "FBN",
                         Sha1 = "deb62b0074b8cae4f162c257662136733cfc76ad",
+                        IsRomFile = true
                     }
                 },
                 isAdbMode
             ),
         };
+    }
+
+    private async Task CheckExistingBiosFiles()
+    {
+        try
+        {
+            isCheckingExistingFiles = true;
+            StateHasChanged();
+
+            foreach (var system in biosSystems)
+            {
+                foreach (var biosFile in system.BiosFiles)
+                {
+                    if (isAdbMode && adbService != null)
+                    {
+                        // Check if file exists on device via ADB
+                        var devicePath = biosFile.DevicePath;
+                        biosFile.ExistsOnTarget = await adbService.PathExistsAsync(devicePath, selectedDevice?.Id);
+
+                        if (biosFile.ExistsOnTarget)
+                        {
+                            // Get SHA1 hash of existing file
+                            biosFile.ActualSha1 = await adbService.GetRemoteFileSha1Async(devicePath, selectedDevice?.Id);
+                            biosFile.IsValidHash = !string.IsNullOrEmpty(biosFile.ActualSha1) &&
+                                biosFile.ActualSha1.Equals(biosFile.Sha1, StringComparison.OrdinalIgnoreCase);
+                        }
+                    }
+                    else
+                    {
+                        // Check if file exists locally (SD card mode)
+                        var localPath = biosFile.ExpectedPath;
+                        biosFile.ExistsOnTarget = File.Exists(localPath);
+
+                        if (biosFile.ExistsOnTarget)
+                        {
+                            // Get SHA1 hash of existing file
+                            biosFile.ActualSha1 = await AdbService.GetLocalFileSha1Async(localPath);
+                            biosFile.IsValidHash = !string.IsNullOrEmpty(biosFile.ActualSha1) &&
+                                biosFile.ActualSha1.Equals(biosFile.Sha1, StringComparison.OrdinalIgnoreCase);
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await SetStatusMessage($"Error checking existing BIOS files: {ex.Message}", false);
+        }
+        finally
+        {
+            isCheckingExistingFiles = false;
+            StateHasChanged();
+        }
     }
 
     private IEnumerable<string> GetUniqueFileNames()
@@ -842,6 +964,15 @@
         return biosSystems
             .SelectMany(s => s.BiosFiles)
             .Where(f => !string.IsNullOrEmpty(f.SelectedPath))
+            .Select(f => f.FileName)
+            .Distinct();
+    }
+
+    private IEnumerable<string> GetUniqueExistingValidFiles()
+    {
+        return biosSystems
+            .SelectMany(s => s.BiosFiles)
+            .Where(f => f.ExistsOnTarget && f.IsValidHash)
             .Select(f => f.FileName)
             .Distinct();
     }
@@ -930,12 +1061,19 @@
     {
         var selectedFiles = biosSystems
             .SelectMany(s => s.BiosFiles)
-            .Where(f => !string.IsNullOrEmpty(f.SelectedPath))
+            .Where(f => !string.IsNullOrEmpty(f.SelectedPath) && (!f.ExistsOnTarget || !f.IsValidHash))
             .ToList();
 
         if (selectedFiles.Count == 0)
         {
-            await SetStatusMessage("No files selected to copy.", false);
+            if (completedFilesCount == totalFilesCount)
+            {
+                await SetStatusMessage("All BIOS files are already present and valid. No copying needed.", true);
+            }
+            else
+            {
+                await SetStatusMessage("No files selected to copy.", false);
+            }
             return;
         }
 
@@ -1012,7 +1150,7 @@
             copyProgress = "Complete!";
             copyStatus = "All selected files copied successfully";
             hasSuccessfullyCopiedFiles = true;
-            await SetStatusMessage($"Successfully copied {GetUniqueSelectedFiles().Count()} unique BIOS file(s) to {selectedFiles.Count} location(s).", true);
+            await SetStatusMessage($"Successfully copied {selectedFiles.Count} BIOS file(s).", true);
 
             // Reset after 3 seconds
             await Task.Delay(3000);
@@ -1036,12 +1174,19 @@
 
         var selectedFiles = biosSystems
             .SelectMany(s => s.BiosFiles)
-            .Where(f => !string.IsNullOrEmpty(f.SelectedPath))
+            .Where(f => !string.IsNullOrEmpty(f.SelectedPath) && (!f.ExistsOnTarget || !f.IsValidHash))
             .ToList();
 
         if (selectedFiles.Count == 0)
         {
-            await SetStatusMessage("No files selected to transfer.", false);
+            if (completedFilesCount == totalFilesCount)
+            {
+                await SetStatusMessage("All BIOS files are already present and valid on device. No transfer needed.", true);
+            }
+            else
+            {
+                await SetStatusMessage("No files selected to transfer.", false);
+            }
             return;
         }
 
@@ -1092,7 +1237,7 @@
                 transferProgress = "Complete!";
                 transferStatus = "All selected files transferred successfully";
                 hasSuccessfullyTransferredFiles = true;
-                await SetStatusMessage($"Successfully transferred {GetUniqueSelectedFiles().Count()} unique BIOS file(s) to device.", true);
+                await SetStatusMessage($"Successfully transferred {selectedFiles.Count} BIOS file(s) to device.", true);
 
                 // Reset after 3 seconds
                 await Task.Delay(3000);
@@ -1166,15 +1311,60 @@
 
             foreach (var biosFile in BiosFiles)
             {
-                if (isAdbMode)
+                if (!string.IsNullOrEmpty(biosFile.CustomPath))
                 {
-                    biosFile.DevicePath = $"{biosRootPath}/{biosFile.SystemCode}/{biosFile.FileName}";
+                    // Use custom path if specified
+                    if (isAdbMode)
+                    {
+                        biosFile.DevicePath = biosFile.CustomPath;
+                    }
+                    else
+                    {
+                        biosFile.ExpectedPath = biosFile.CustomPath;
+                    }
+                }
+                else if (biosFile.IsRomFile)
+                {
+                    // For ROM files, use Roms directory instead of Bios
+                    var romsBasePath = biosRootPath.Replace("/Bios", "/Roms").Replace("\\Bios", "\\Roms");
+                    var romDirName = GetRomDirectoryName(biosFile.SystemCode, systemName);
+
+                    if (isAdbMode)
+                    {
+                        biosFile.DevicePath = $"{romsBasePath}/{romDirName}/{biosFile.FileName}";
+                    }
+                    else
+                    {
+                        biosFile.ExpectedPath = Path.Combine(romsBasePath, romDirName, biosFile.FileName);
+                    }
                 }
                 else
                 {
-                    biosFile.ExpectedPath = Path.Combine(biosRootPath, biosFile.SystemCode, biosFile.FileName);
+                    // Standard BIOS path
+                    if (isAdbMode)
+                    {
+                        biosFile.DevicePath = $"{biosRootPath}/{biosFile.SystemCode}/{biosFile.FileName}";
+                    }
+                    else
+                    {
+                        biosFile.ExpectedPath = Path.Combine(biosRootPath, biosFile.SystemCode, biosFile.FileName);
+                    }
                 }
             }
+        }
+
+        private string GetRomDirectoryName(string systemCode, string systemName)
+        {
+            // Handle special cases where ROM path system name might be different
+            var pathSystemName = systemCode switch
+            {
+                "FC" => "Nintendo Entertainment System",
+                "MD" => "Sega Genesis",
+                _ when !string.IsNullOrEmpty(systemName) => systemName,
+                _ => systemCode
+            };
+
+            return $"{pathSystemName} ({systemCode})";
         }
     }
 
@@ -1186,6 +1376,11 @@
         public string DevicePath { get; set; } = "";
         public string SelectedPath { get; set; } = "";
         public string Sha1 { get; set; } = "";
+        public bool ExistsOnTarget { get; set; } = false;
+        public bool IsValidHash { get; set; } = false;
+        public string? ActualSha1 { get; set; }
+        public string? CustomPath { get; set; } // Custom path override for files that don't go in standard BIOS location
+        public bool IsRomFile { get; set; } = false; // Indicates this "BIOS" file actually goes in the ROM directory
     }
 
     public void Dispose()
