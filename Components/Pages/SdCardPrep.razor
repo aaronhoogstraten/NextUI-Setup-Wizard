@@ -727,7 +727,7 @@
             await JSRuntime.InvokeVoidAsync("eval", "document.getElementById('splashOverlay').classList.add('fade-out')");
 
             // Scroll to page header when page first loads
-            await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"page-header\"]').scrollIntoView({behavior: 'auto', block: 'start'});");
+            await Utils.ScrollToPageHeaderAsync(JSRuntime);
         }
     }
 
@@ -991,7 +991,7 @@
             
             // Auto-scroll to progress bar
             await Task.Delay(50); // Allow DOM to render
-            await JSRuntime.InvokeVoidAsync("eval", $"document.querySelector('[data-ref=\"progress-container\"]').scrollIntoView({{behavior: 'smooth', block: 'end'}});");
+            await Utils.ScrollToProgressContainerAsync(JSRuntime);
 
             await WipeSDCard(selectedPath);
 

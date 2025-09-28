@@ -811,7 +811,7 @@
         if (firstRender)
         {
             // Scroll to page header when page first loads
-            await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"page-header\"]').scrollIntoView({behavior: 'auto', block: 'start'});");
+            await Utils.ScrollToPageHeaderAsync(JSRuntime);
         }
     }
 
@@ -1024,7 +1024,7 @@
             
             // Auto-scroll to progress bar
             await Task.Delay(50); // Allow DOM to render
-            await JSRuntime.InvokeVoidAsync("eval", $"document.querySelector('[data-ref=\"progress-container\"]').scrollIntoView({{behavior: 'smooth', block: 'end'}});");
+            await Utils.ScrollToProgressContainerAsync(JSRuntime);
 
             for (int i = 0; i < allSelectedFiles.Count; i++)
             {
@@ -1098,7 +1098,7 @@
 
             // Auto-scroll to progress bar
             await Task.Delay(50);
-            await JSRuntime.InvokeVoidAsync("eval", $"document.querySelector('[data-ref=\"progress-container\"]').scrollIntoView({{behavior: 'smooth', block: 'end'}});");
+            await Utils.ScrollToProgressContainerAsync(JSRuntime);
 
             // Prepare file list for transfer
             var romFilesToCopy = allSelectedFiles.Select(item => new RomFileCopy
@@ -1171,7 +1171,7 @@
     private async Task ScrollToStatusMessage()
     {
         await Task.Delay(50); // Allow DOM to render
-        await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('.status-message').scrollIntoView({behavior: 'smooth', block: 'center'});");
+        await Utils.ScrollToStatusMessageAsync(JSRuntime);
     }
 
     private async Task SetStatusMessage(string message, bool success)

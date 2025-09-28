@@ -70,12 +70,50 @@ namespace NextUI_Setup_Wizard.Resources
                     return new AdbResult { IsSuccess = false, Error = $"ROMs directory not found at {romsPath}. Please ensure NextUI is properly installed." };
                 }
 
-                progress?.Report("NextUI directories verified successfully!");
-                return new AdbResult { IsSuccess = true, Output = "NextUI directories verified" };
+                // Check for NextUI version file
+                progress?.Report("Verifying NextUI version file...");
+                var versionFileExists = await VerifyNextUIVersionFileAsync(basePath);
+                if (!versionFileExists)
+                {
+                    return new AdbResult { IsSuccess = false, Error = "NextUI version file not found. Please ensure NextUI is properly installed on your device." };
+                }
+
+                progress?.Report("NextUI installation verified successfully!");
+                return new AdbResult { IsSuccess = true, Output = "NextUI installation verified" };
             }
             catch (Exception ex)
             {
                 return new AdbResult { IsSuccess = false, Error = ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// Verifies that NextUI version file exists on the device
+        /// </summary>
+        private async Task<bool> VerifyNextUIVersionFileAsync(string basePath)
+        {
+            try
+            {
+                // Check for MinUI.zip first
+                var minUIZipPath = Path.Combine(basePath, "MinUI.zip").Replace('\\', '/');
+                if (await _adbService.PathExistsAsync(minUIZipPath, _selectedDeviceId))
+                {
+                    // If MinUI.zip exists, we assume NextUI is installed
+                    return true;
+                }
+
+                // Check for .system/version.txt directly on filesystem
+                var versionFilePath = Path.Combine(basePath, ".system", "version.txt").Replace('\\', '/');
+                if (await _adbService.PathExistsAsync(versionFilePath, _selectedDeviceId))
+                {
+                    return true;
+                }
+
+                return false;
+            }
+            catch (Exception)
+            {
+                return false;
             }
         }
 

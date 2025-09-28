@@ -1,4 +1,5 @@
 ﻿@page "/setup-complete"
+@using NextUI_Setup_Wizard.Resources
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
 
@@ -364,7 +365,7 @@
         if (firstRender)
         {
             // Scroll to page header when page first loads
-            await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"page-header\"]').scrollIntoView({behavior: 'auto', block: 'start'});");
+            await Utils.ScrollToPageHeaderAsync(JSRuntime);
         }
     }
 
