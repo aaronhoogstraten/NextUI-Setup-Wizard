@@ -1165,7 +1165,7 @@
     {
         await SetStatusMessage("ROM setup skipped. You can add ROM files later by copying them to the appropriate system directories.", true);
 
-        Navigation.NavigateTo("/setup-complete");
+        Navigation.NavigateTo($"/setup-complete{(isAdbMode ? "/adb" : "")}");
     }
 
     private async Task ScrollToStatusMessage()
