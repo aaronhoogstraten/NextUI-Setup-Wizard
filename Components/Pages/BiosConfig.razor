@@ -686,6 +686,9 @@
             }
         }
 
+        // Scroll to top of page instantly after extractedPath is set
+        await Utils.ScrollToPageHeaderAsync(JSRuntime);
+
         // Check if we're on the ADB-specific route
         if (string.IsNullOrEmpty(Mode) && Navigation.Uri.EndsWith("/bios-config/adb"))
         {
@@ -918,7 +921,7 @@
                         if (biosFile.ExistsOnTarget)
                         {
                             // Get SHA1 hash of existing file
-                            biosFile.ActualSha1 = await adbService.GetRemoteFileSha1Async(devicePath, selectedDevice?.Id);
+                            biosFile.ActualSha1 = await adbService.GetRemoteFileSha1ByPullAsync(devicePath, selectedDevice?.Id);
                             biosFile.IsValidHash = !string.IsNullOrEmpty(biosFile.ActualSha1) &&
                                 biosFile.ActualSha1.Equals(biosFile.Sha1, StringComparison.OrdinalIgnoreCase);
                         }

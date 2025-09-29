@@ -428,70 +428,12 @@ namespace NextUI_Setup_Wizard.Resources
         }
 
         /// <summary>
-        /// Gets the SHA1 hash of a remote file via ADB
-        /// For systems without hash utilities (like Tina Linux), pulls file temporarily and computes hash locally
+        /// Gets SHA1 hash by temporarily pulling the remote file and computing hash locally
         /// </summary>
         /// <param name="remotePath">Remote path to the file</param>
         /// <param name="deviceId">Optional device ID if multiple devices</param>
         /// <returns>SHA1 hash string or null if failed</returns>
-        public async Task<string?> GetRemoteFileSha1Async(string remotePath, string? deviceId = null)
-        {
-            try
-            {
-                var deviceArg = !string.IsNullOrEmpty(deviceId) ? $"-s {deviceId}" : "";
-
-                // Try different hash commands available on some Linux systems
-                string[] hashCommands = {
-                    $"shell sha1sum \"{remotePath}\"",
-                    $"shell openssl dgst -sha1 \"{remotePath}\"",
-                    $"shell busybox sha1sum \"{remotePath}\"",
-                    $"shell toybox sha1sum \"{remotePath}\""
-                };
-
-                foreach (var hashCmd in hashCommands)
-                {
-                    var command = $"{deviceArg} {hashCmd}".Trim();
-                    var result = await ExecuteAdbCommandAsync(command);
-
-                    if (result.IsSuccess && !string.IsNullOrEmpty(result.Output) &&
-                        !result.Output.Contains("not found") && !result.Output.Contains("No such file"))
-                    {
-                        // Handle different output formats
-                        if (hashCmd.Contains("openssl"))
-                        {
-                            // openssl output format: "SHA1(filename)= hash"
-                            var match = System.Text.RegularExpressions.Regex.Match(result.Output, @"SHA1\([^)]+\)=\s*([a-fA-F0-9]+)");
-                            if (match.Success)
-                            {
-                                return match.Groups[1].Value.Trim().ToLowerInvariant();
-                            }
-                        }
-                        else
-                        {
-                            // sha1sum output format: "hash  filename"
-                            var parts = result.Output.Split(new char[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                            if (parts.Length > 0 && System.Text.RegularExpressions.Regex.IsMatch(parts[0], @"^[a-fA-F0-9]{40}$"))
-                            {
-                                return parts[0].Trim().ToLowerInvariant();
-                            }
-                        }
-                    }
-                }
-
-                // Fallback: Pull file temporarily and compute hash locally
-                // This works for systems like Tina Linux that lack hash utilities
-                return await GetRemoteFileSha1ByPullAsync(remotePath, deviceId);
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// Gets SHA1 hash by temporarily pulling the remote file and computing hash locally
-        /// </summary>
-        private async Task<string?> GetRemoteFileSha1ByPullAsync(string remotePath, string? deviceId = null)
+        public async Task<string?> GetRemoteFileSha1ByPullAsync(string remotePath, string? deviceId = null)
         {
             string? tempFilePath = null;
             try
