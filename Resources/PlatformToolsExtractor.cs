@@ -67,6 +67,8 @@ namespace NextUI_Setup_Wizard.Resources
 
                     if (Directory.Exists(basePath))
                     {
+                        Logger.LogImmediate("macOS homebrew android-platform-tools exists");
+
                         // Scan for version subdirectories
                         var versionDirs = Directory.GetDirectories(basePath);
                         foreach (var versionDir in versionDirs)
@@ -77,6 +79,7 @@ namespace NextUI_Setup_Wizard.Resources
                                 var adbPath = Path.Combine(platformToolsPath, "adb");
                                 if (File.Exists(adbPath))
                                 {
+                                    Logger.LogImmediate("macOS homebrew adb exists");
                                     _extractionPath = platformToolsPath;
                                     _usingExistingPath = true;
                                     return true;
