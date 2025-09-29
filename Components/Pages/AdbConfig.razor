@@ -217,16 +217,34 @@
                                     </div>
                                 }
 
-                                <button class="btn btn-success" @onclick="VerifyDeviceDirectories" disabled="@isVerifyingDevice">
-                                    @if (isVerifyingDevice)
-                                    {
+                                @if (isVerifyingDevice)
+                                {
+                                    <div class="verification-status">
+                                        <span class="status-icon">⏳</span>
                                         <span>@verifyProgress</span>
-                                    }
-                                    else
-                                    {
-                                        <span>Verify NextUI Installation</span>
-                                    }
-                                </button>
+                                    </div>
+                                }
+                                else if (isDeviceVerified)
+                                {
+                                    <div class="verification-status verified">
+                                        <span class="status-icon">✓</span>
+                                        <span>NextUI installation verified on device.</span>
+                                    </div>
+                                }
+                                else if (hasVerificationFailed)
+                                {
+                                    <div class="verification-status failed">
+                                        <span class="status-icon">✗</span>
+                                        <span>NextUI installation verification failed.</span>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="verification-status pending">
+                                        <span class="status-icon">○</span>
+                                        <span>Verification pending...</span>
+                                    </div>
+                                }
                             </div>
                         }
                     }
@@ -523,6 +541,39 @@
         transition: width 0.3s ease;
     }
 
+    .verification-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        border-radius: 6px;
+        margin-top: 10px;
+        font-size: 0.9em;
+    }
+
+        .verification-status.verified {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .verification-status.pending {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .verification-status.failed {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .verification-status .status-icon {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
     .success-message, .no-devices-message, .ready-message, .incomplete-message {
         display: flex;
         align-items: center;
@@ -743,6 +794,7 @@
 
     private bool isAdbReady => platformToolsExtractor?.IsAdbAvailable() == true;
     private bool isDeviceVerified = false;
+    private bool hasVerificationFailed = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -1046,6 +1098,8 @@
         try
         {
             isVerifyingDevice = true;
+            isDeviceVerified = false;
+            hasVerificationFailed = false;
             verifyProgress = "Verifying...";
             StateHasChanged();
 
@@ -1064,11 +1118,13 @@
             }
             else
             {
+                hasVerificationFailed = true;
                 await SetStatusMessage($"NextUI verification failed: {result.Error}", false);
             }
         }
         catch (Exception ex)
         {
+            hasVerificationFailed = true;
             await SetStatusMessage($"Error verifying device: {ex.Message}", false);
         }
         finally
