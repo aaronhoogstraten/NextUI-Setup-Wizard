@@ -6,6 +6,7 @@
 @using System.Security.Cryptography
 @using CommunityToolkit.Maui.Storage
 @using NextUI_Setup_Wizard.Resources
+@using static NextUI_Setup_Wizard.Resources.Utils
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
@@ -464,7 +465,7 @@
         if (firstRender)
         {
             // Scroll to page header when page first loads
-            await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"page-header\"]').scrollIntoView({behavior: 'auto', block: 'start'});");
+            await Utils.ScrollToPageHeaderAsync(JSRuntime);
         }
     }
 
@@ -701,7 +702,7 @@
     private async Task ScrollToDownloadMessage()
     {
         await Task.Delay(50); // Allow DOM to render
-        await JSRuntime.InvokeVoidAsync("eval", "document.querySelector('[data-ref=\"download-message\"]').scrollIntoView({behavior: 'smooth', block: 'end'});");
+        await Utils.ScrollToElementAsync(JSRuntime, "download-message", SelectorType.DataRef, "smooth", "end");
     }
 
     private async Task SetDownloadState(string message, bool success = false, bool stopDownloading = true)
@@ -744,7 +745,7 @@
             
             // Auto-scroll to progress bar
             await Task.Delay(50); // Allow DOM to render
-            await JSRuntime.InvokeVoidAsync("eval", $"document.querySelector('[data-ref=\"progress-container\"]').scrollIntoView({{behavior: 'smooth', block: 'end'}});");
+            await Utils.ScrollToProgressContainerAsync(JSRuntime);
 
 
             string? extractPath = null;
