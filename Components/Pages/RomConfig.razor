@@ -12,6 +12,7 @@
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
 @inject HttpClient Http
+@inject PlatformToolsExtractor platformToolsExtractor
 @implements IDisposable
 
 <!-- ADB Command Window (only show in ADB mode) -->
@@ -717,7 +718,6 @@
     [Parameter] public string? Mode { get; set; }
 
     // ADB-related properties
-    private PlatformToolsExtractor? platformToolsExtractor;
     private AdbService? adbService;
     private AdbFileOperations? adbFileOps;
     private AdbDevice? selectedDevice;
@@ -782,8 +782,6 @@
         // Initialize ADB components if in ADB mode
         if (isAdbMode)
         {
-            platformToolsExtractor = new PlatformToolsExtractor();
-
             if (platformToolsExtractor.IsAdbAvailable())
             {
                 adbService = new AdbService(platformToolsExtractor.AdbExecutablePath);

@@ -7,6 +7,7 @@
 @using NextUI_Setup_Wizard.Components.Shared
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
+@inject PlatformToolsExtractor platformToolsExtractor
 @implements IDisposable
 
 <!-- ADB Command Window -->
@@ -764,7 +765,6 @@
 </style>
 
 @code {
-    private PlatformToolsExtractor? platformToolsExtractor;
     private AdbService? adbService;
     private AdbFileOperations? adbFileOps;
     private AdbCommandLogger adbCommandLogger = new();
@@ -798,8 +798,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        platformToolsExtractor = new PlatformToolsExtractor();
-
         // Try to auto-detect existing installations (e.g., Homebrew on macOS)
         if (!platformToolsExtractor.IsAdbAvailable())
         {
@@ -961,8 +959,7 @@
                 return;
             }
 
-            // Create a new PlatformToolsExtractor with the existing path
-            platformToolsExtractor = new PlatformToolsExtractor();
+            // Set the existing path on the injected singleton
             if (platformToolsExtractor.SetExistingPath(existingPlatformToolsPath))
             {
                 InitializeAdbService();
