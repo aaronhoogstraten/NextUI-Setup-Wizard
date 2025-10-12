@@ -145,26 +145,138 @@ namespace NextUI_Setup_Wizard.Resources
             }
         }
 
+        /// <summary>
+        /// Pulls a file from the device
+        /// </summary>
+        /// <param name="remotePath">Remote file path on device</param>
+        /// <param name="localPath">Local destination path</param>
+        /// <param name="deviceId">Optional device ID if multiple devices</param>
+        /// <param name="progress">Optional progress callback</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        public async Task<AdbResult> PullFileAsync(
+            string remotePath,
+            string localPath,
+            string? deviceId = null,
+            IProgress<string>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var fileName = Path.GetFileName(remotePath);
+                progress?.Report($"Pulling {fileName} from device...");
+
+                var deviceArg = !string.IsNullOrEmpty(deviceId) ? $"-s {deviceId}" : "";
+                var command = $"{deviceArg} pull \"{remotePath}\" \"{localPath}\"".Trim();
+
+                var result = await ExecuteAdbCommandAsync(command, progress, cancellationToken);
+
+                if (result.IsSuccess)
+                {
+                    progress?.Report($"Successfully pulled {fileName}");
+                }
+                else
+                {
+                    progress?.Report($"Failed to pull {fileName}: {result.Error}");
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return new AdbResult { IsSuccess = false, Error = ex.Message };
+            }
+        }
+
+        /// <summary>
+        /// Recursively pulls a directory from the device
+        /// </summary>
+        /// <param name="remotePath">Remote directory path on device</param>
+        /// <param name="localPath">Local destination directory</param>
+        /// <param name="deviceId">Optional device ID if multiple devices</param>
+        /// <param name="progress">Optional progress callback</param>
+        /// <param name="cancellationToken">Cancellation token</param>
+        public async Task<AdbResult> PullDirectoryAsync(
+            string remotePath,
+            string localPath,
+            string? deviceId = null,
+            IProgress<string>? progress = null,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                // Ensure local directory exists
+                Directory.CreateDirectory(localPath);
+
+                progress?.Report($"Pulling directory {remotePath}...");
+
+                var deviceArg = !string.IsNullOrEmpty(deviceId) ? $"-s {deviceId}" : "";
+                var command = $"{deviceArg} pull \"{remotePath}\" \"{localPath}\"".Trim();
+
+                var result = await ExecuteAdbCommandAsync(command, progress, cancellationToken, timeout: 120000); // 2 minute timeout for directories
+
+                if (result.IsSuccess)
+                {
+                    progress?.Report($"Successfully pulled directory {remotePath}");
+                }
+                else
+                {
+                    progress?.Report($"Failed to pull directory: {result.Error}");
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                return new AdbResult { IsSuccess = false, Error = ex.Message };
+            }
+        }
+
 
         /// <summary>
         /// Lists files in a directory on the device
         /// </summary>
         /// <param name="remotePath">Remote directory path</param>
         /// <param name="deviceId">Optional device ID if multiple devices</param>
-        public async Task<List<string>> ListFilesAsync(string remotePath, string? deviceId = null)
+        /// <param name="directoriesOnly">If true, only list directories (not files)</param>
+        public async Task<List<string>> ListFilesAsync(string remotePath, string? deviceId = null, bool directoriesOnly = false)
         {
             var files = new List<string>();
 
             try
             {
                 var deviceArg = !string.IsNullOrEmpty(deviceId) ? $"-s {deviceId}" : "";
-                var command = $"{deviceArg} shell ls \"{remotePath}\"".Trim();
+
+                // Use ls with -1 to force one entry per line and --color=never to prevent ANSI color codes
+                // If directoriesOnly is true, use -d */ to list only directories
+                var listCommand = directoriesOnly ? "ls -1 -d --color=never */" : "ls -1 --color=never";
+                var command = $"{deviceArg} shell \"cd \\\"{remotePath}\\\" && {listCommand}\"".Trim();
 
                 var result = await ExecuteAdbCommandAsync(command);
-                if (result.IsSuccess)
+
+                var output = result.Output;
+                var error = result.Error ?? "";
+
+                // Check for common error messages in both output and error streams
+                var combinedOutput = output + " " + error;
+                if (combinedOutput.Contains("No such file or directory") ||
+                    combinedOutput.Contains("cannot access") ||
+                    combinedOutput.Contains("not found") ||
+                    combinedOutput.Contains("can't cd to") ||
+                    combinedOutput.Contains("does not exist"))
                 {
-                    var lines = result.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-                    files.AddRange(lines.Select(line => line.Trim()).Where(line => !string.IsNullOrEmpty(line)));
+                    return files; // Return empty list
+                }
+
+                if (result.IsSuccess && !string.IsNullOrEmpty(output))
+                {
+                    var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                    files.AddRange(lines.Select(line => {
+                        var cleaned = StripAnsiCodes(line.Trim());
+                        // Remove trailing slash if present (from directory listing)
+                        return cleaned.TrimEnd('/');
+                    }).Where(line => !string.IsNullOrEmpty(line) &&
+                                     !line.Contains("can't cd") &&
+                                     !line.Contains("No such file")));
                 }
             }
             catch (Exception ex)
@@ -173,6 +285,19 @@ namespace NextUI_Setup_Wizard.Resources
             }
 
             return files;
+        }
+
+        /// <summary>
+        /// Strips ANSI color codes and escape sequences from a string
+        /// </summary>
+        private static string StripAnsiCodes(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            // Remove ANSI escape sequences (color codes, cursor movements, etc.)
+            // Pattern matches ESC[ followed by any characters up to and including a letter
+            return System.Text.RegularExpressions.Regex.Replace(input, @"\x1B\[[0-9;]*[a-zA-Z]", string.Empty);
         }
 
         /// <summary>

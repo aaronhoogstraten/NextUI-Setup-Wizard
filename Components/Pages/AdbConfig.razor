@@ -5,6 +5,7 @@
 @using NextUI_Setup_Wizard.Resources
 @using static NextUI_Setup_Wizard.Resources.Utils
 @using NextUI_Setup_Wizard.Components.Shared
+@using NextUI_Setup_Wizard.Components.Layout
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
 @inject PlatformToolsExtractor platformToolsExtractor
@@ -16,8 +17,16 @@
 <!-- Floating ADB Log Button -->
 <AdbLogButton CommandLogger="@adbCommandLogger" IsAdbMode="true" />
 
+<!-- Log Zipper Overlay -->
+<LogZipper IsVisible="@showLogZipper" OnHide="HideLogZipperOverlay" />
+
 <div class="compact-container">
-    <h3 data-ref="page-header">ADB Configuration</h3>
+    <div class="page-header-container">
+        <div class="toolbox-container">
+            <ToolboxDropdown OnLogZipperRequest="ShowLogZipperOverlay" />
+        </div>
+        <h3 data-ref="page-header">ADB Configuration</h3>
+    </div>
     <p class="intro-text">Configure Android Debug Bridge (ADB) to transfer files directly to your emulation device without removing the SD card.<br><strong>Note:</strong> NextUI should already be installed on your device before using this method.</p>
 
     <div class="warning-message">
@@ -743,6 +752,28 @@
         border: 1px solid #f5c6cb;
     }
 
+    /* Page header and toolbox button styles */
+    .page-header-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .toolbox-container {
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 1001;
+    }
+
+    .page-header-container h3 {
+        flex: 1;
+        text-align: center;
+        margin: 0;
+    }
+
     @@media (max-width: 768px) {
         .compact-container {
             padding: 15px;
@@ -761,6 +792,17 @@
         .device-info {
             justify-content: center;
         }
+
+        .page-header-container {
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .toolbox-container {
+            position: static;
+            transform: none;
+        }
     }
 </style>
 
@@ -768,6 +810,9 @@
     private AdbService? adbService;
     private AdbFileOperations? adbFileOps;
     private AdbCommandLogger adbCommandLogger = new();
+
+    // Log Zipper
+    private bool showLogZipper = false;
 
     private string selectedPlatformToolsPath = "";
     private bool isSelectingFile = false;
@@ -1154,6 +1199,18 @@
     private async Task ScrollToStatusMessage()
     {
         await Utils.ScrollToStatusMessageAsync(JSRuntime);
+    }
+
+    private void ShowLogZipperOverlay()
+    {
+        showLogZipper = true;
+        StateHasChanged();
+    }
+
+    private void HideLogZipperOverlay()
+    {
+        showLogZipper = false;
+        StateHasChanged();
     }
 
     public void Dispose()

@@ -3,6 +3,8 @@
 @using CommunityToolkit.Maui.Storage
 @using NextUI_Setup_Wizard.Resources
 @inject IJSRuntime JSRuntime
+@inject PlatformToolsExtractor platformToolsExtractor
+@inject NavigationManager Navigation
 
 <!-- Log Zipper overlay -->
 @if (IsVisible)
@@ -42,31 +44,118 @@
                 else
                 {
                     <div class="tool-description">
-                        <p>This tool will search for all log files from a previously prepared NextUI installation and create a single zip archive.</p>
-                        <p><strong>Search location:</strong> <code>{sdCardPath}/.userdata/*/logs/</code></p>
+                        <p>This tool will search for all log files from a NextUI installation and create a single zip archive.</p>
+                        <p><strong>Search location:</strong> <code>@(useAdbMode ? "/mnt/SDCARD/.userdata/*/logs/" : "{sdCardPath}/.userdata/*/logs/")</code></p>
                     </div>
 
-                    <div class="sd-card-selection">
-                        @if (!string.IsNullOrEmpty(selectedLogPath))
-                        {
-                            <div class="selected-path">
-                                <p><strong>Selected SD Card Path:</strong></p>
-                                <p class="path-display">@selectedLogPath</p>
-                            </div>
-                        }
-
-                        <div class="tool-actions">
-                            <button class="btn btn-primary" @onclick="SelectSDCardForLogs">
-                                📁 Select SD Card Directory
+                    <!-- Mode Selection Tabs -->
+                    <div class="mode-selection">
+                        <div class="mode-tabs">
+                            <button class="tab-button @(!useAdbMode ? "active" : "")" @onclick="() => SwitchToSdCardMode()">
+                                💾 SD Card Mode
                             </button>
-                            @if (!string.IsNullOrEmpty(selectedLogPath))
-                            {
-                                <button class="btn btn-success" @onclick="ZipLogFiles">
-                                    📦 Create Log Archive
-                                </button>
-                            }
+                            <button class="tab-button @(useAdbMode ? "active" : "")" @onclick="() => SwitchToAdbMode()">
+                                📱 ADB Mode
+                            </button>
                         </div>
                     </div>
+
+                    @if (!useAdbMode)
+                    {
+                        <!-- SD Card Mode -->
+                        <div class="sd-card-selection">
+                            @if (!string.IsNullOrEmpty(selectedLogPath))
+                            {
+                                <div class="selected-path">
+                                    <p><strong>Selected SD Card Path:</strong></p>
+                                    <p class="path-display">@selectedLogPath</p>
+                                </div>
+                            }
+
+                            <div class="tool-actions">
+                                <button class="btn btn-primary" @onclick="SelectSDCardForLogs">
+                                    📁 Select SD Card Directory
+                                </button>
+                                @if (!string.IsNullOrEmpty(selectedLogPath))
+                                {
+                                    <button class="btn btn-success" @onclick="ZipLogFiles">
+                                        📦 Create Log Archive
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- ADB Mode -->
+                        <div class="adb-selection">
+                            @if (!isAdbAvailable)
+                            {
+                                <div class="warning-box">
+                                    <p>⚠️ ADB is not configured. Please configure ADB in the <a href="/adb-config" class="warning-link" @onclick="NavigateToAdbConfig" @onclick:preventDefault="true"><strong>ADB Configuration</strong></a> page first.</p>
+                                </div>
+                            }
+                            else
+                            {
+                                @if (selectedDevice == null)
+                                {
+                                    <div class="device-selection">
+                                        <p>Select a connected device to pull log files from:</p>
+                                        <button class="btn btn-primary" @onclick="RefreshAdbDevices" disabled="@isRefreshingDevices">
+                                            @if (isRefreshingDevices)
+                                            {
+                                                <span>Checking...</span>
+                                            }
+                                            else
+                                            {
+                                                <span>🔄 Check for Devices</span>
+                                            }
+                                        </button>
+
+                                        @if (adbDevices.Any())
+                                        {
+                                            <div class="devices-list">
+                                                @foreach (var device in adbDevices)
+                                                {
+                                                    <div class="device-item @(device.IsOnline ? "online" : "offline")">
+                                                        <div class="device-info">
+                                                            <span class="device-status">@(device.IsOnline ? "🟢" : "🔴")</span>
+                                                            <span class="device-name">@device.DisplayName</span>
+                                                        </div>
+                                                        @if (device.IsOnline)
+                                                        {
+                                                            <button class="btn btn-sm btn-primary" @onclick="() => SelectAdbDevice(device)">
+                                                                Select
+                                                            </button>
+                                                        }
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                        else if (hasCheckedAdbDevices)
+                                        {
+                                            <div class="warning-box">
+                                                <p>⚠️ No devices found. Make sure your device is connected and USB debugging is enabled.</p>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="selected-device">
+                                        <p><strong>Selected Device:</strong> @selectedDevice.DisplayName</p>
+                                        <button class="btn btn-sm btn-secondary" @onclick="ClearAdbDevice">Change Device</button>
+                                    </div>
+
+                                    <div class="tool-actions">
+                                        <button class="btn btn-success" @onclick="PullAndZipLogsFromDevice">
+                                            📦 Pull Logs & Create Archive
+                                        </button>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    }
                 }
             </div>
         </div>
@@ -77,7 +166,19 @@
     [Parameter] public bool IsVisible { get; set; }
     [Parameter] public EventCallback OnHide { get; set; }
 
+    // SD Card Mode
     private string selectedLogPath = "";
+
+    // ADB Mode
+    private bool useAdbMode = false;
+    private bool isAdbAvailable => platformToolsExtractor?.IsAdbAvailable() == true;
+    private AdbService? adbService;
+    private List<AdbDevice> adbDevices = new();
+    private AdbDevice? selectedDevice;
+    private bool isRefreshingDevices = false;
+    private bool hasCheckedAdbDevices = false;
+
+    // Common
     private string logZipperError = "";
     private bool isZippingLogs = false;
     private string zipProgress = "";
@@ -87,6 +188,9 @@
     private async Task Hide()
     {
         selectedLogPath = "";
+        selectedDevice = null;
+        adbDevices.Clear();
+        hasCheckedAdbDevices = false;
         logZipperError = "";
         isZippingLogs = false;
         zipProgress = "";
@@ -94,6 +198,82 @@
         zipCompleteMessage = "";
 
         await OnHide.InvokeAsync();
+    }
+
+    private void SwitchToSdCardMode()
+    {
+        useAdbMode = false;
+        selectedDevice = null;
+        adbDevices.Clear();
+        hasCheckedAdbDevices = false;
+        logZipperError = "";
+        zipCompleteMessage = "";
+        StateHasChanged();
+    }
+
+    private void SwitchToAdbMode()
+    {
+        useAdbMode = true;
+        selectedLogPath = "";
+        logZipperError = "";
+        zipCompleteMessage = "";
+
+        // Initialize ADB service if available
+        if (isAdbAvailable && adbService == null)
+        {
+            adbService = new AdbService(platformToolsExtractor.AdbExecutablePath);
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task RefreshAdbDevices()
+    {
+        if (adbService == null)
+            return;
+
+        try
+        {
+            isRefreshingDevices = true;
+            logZipperError = "";
+            StateHasChanged();
+
+            adbDevices = await adbService.GetDevicesAsync();
+            hasCheckedAdbDevices = true;
+
+            if (!adbDevices.Any(d => d.IsOnline))
+            {
+                logZipperError = "No online devices found. Make sure your device is connected and USB debugging is enabled.";
+            }
+        }
+        catch (Exception ex)
+        {
+            logZipperError = $"Error checking for devices: {ex.Message}";
+        }
+        finally
+        {
+            isRefreshingDevices = false;
+            StateHasChanged();
+        }
+    }
+
+    private void SelectAdbDevice(AdbDevice device)
+    {
+        selectedDevice = device;
+        logZipperError = "";
+        StateHasChanged();
+    }
+
+    private void ClearAdbDevice()
+    {
+        selectedDevice = null;
+        StateHasChanged();
+    }
+
+    private async Task NavigateToAdbConfig()
+    {
+        await Hide();
+        Navigation.NavigateTo("/adb-config");
     }
 
     private async Task SelectSDCardForLogs()
@@ -249,6 +429,261 @@
         }
     }
 
+    private async Task PullAndZipLogsFromDevice()
+    {
+        if (adbService == null || selectedDevice == null)
+            return;
+
+        try
+        {
+            isZippingLogs = true;
+            zipProgress = "Checking device for log directories...";
+            zipPercentage = 0;
+            logZipperError = "";
+            zipCompleteMessage = "";
+            StateHasChanged();
+
+            await Task.Delay(500); // Allow UI to update
+
+            // Create temporary directory for pulled logs
+            var tempLogPath = Path.Combine(FileSystem.CacheDirectory, $"device_logs_{DateTime.Now:yyyyMMdd_HHmmss}");
+            Directory.CreateDirectory(tempLogPath);
+
+            try
+            {
+                // Get list of subdirectories in .userdata on device
+                var userDataPath = "/mnt/SDCARD/.userdata";
+                var subdirs = await adbService.ListFilesAsync(userDataPath, selectedDevice.Id, directoriesOnly: true);
+
+                if (subdirs == null || subdirs.Count == 0)
+                {
+                    logZipperError = "No subdirectories found in .userdata on device. This doesn't appear to be a NextUI installation.";
+                    isZippingLogs = false;
+                    StateHasChanged();
+                    return;
+                }
+
+                zipProgress = $"Found {subdirs.Count} subdirectories in .userdata, checking for logs...";
+                zipPercentage = 10;
+                StateHasChanged();
+                await Task.Delay(300);
+
+                // Check each subdirectory for logs folder
+                var logDirectories = new List<string>();
+                int checkedDirs = 0;
+                foreach (var subdir in subdirs)
+                {
+                    checkedDirs++;
+                    zipProgress = $"Checking for logs in {subdir}... ({checkedDirs}/{subdirs.Count})";
+                    StateHasChanged();
+
+                    var logsPath = $"{userDataPath}/{subdir}/logs";
+
+                    // Use a more reliable check: try to list the contents of the logs directory
+                    // If it exists and has contents, we can pull it
+                    var logFiles = await adbService.ListFilesAsync(logsPath, selectedDevice.Id);
+
+                    if (logFiles != null && logFiles.Count > 0)
+                    {
+                        logDirectories.Add(logsPath);
+                        zipProgress = $"✓ Found logs in {subdir} ({logFiles.Count} items)";
+                    }
+                    else
+                    {
+                        zipProgress = $"⊘ No logs in {subdir}";
+                    }
+
+                    StateHasChanged();
+                    await Task.Delay(200);
+                }
+
+                if (logDirectories.Count == 0)
+                {
+                    logZipperError = "No log directories found in any .userdata subdirectories on device.";
+                    isZippingLogs = false;
+                    StateHasChanged();
+                    return;
+                }
+
+                zipProgress = $"Found {logDirectories.Count} log directories. Pulling from device...";
+                zipPercentage = 20;
+                StateHasChanged();
+                await Task.Delay(300);
+
+                // Pull each log directory from device
+                int pulledDirs = 0;
+                foreach (var logDir in logDirectories)
+                {
+                    var dirName = Path.GetFileName(Path.GetDirectoryName(logDir)) ?? "unknown";
+                    // Pull to dirName folder - adb pull will create the "logs" subdirectory automatically
+                    var localDestDir = Path.Combine(tempLogPath, dirName);
+
+                    // Double-check the directory exists before attempting pull
+                    zipProgress = $"Verifying {dirName}/logs... ({pulledDirs + 1}/{logDirectories.Count})";
+                    StateHasChanged();
+
+                    var verifyExists = await adbService.PathExistsAsync(logDir, selectedDevice.Id);
+                    if (!verifyExists)
+                    {
+                        zipProgress = $"⚠ Skipping {dirName}/logs (not accessible)";
+                        StateHasChanged();
+                        await Task.Delay(500);
+                        continue; // Skip this directory
+                    }
+
+                    zipProgress = $"Pulling logs from {dirName}... ({pulledDirs + 1}/{logDirectories.Count})";
+                    zipPercentage = 20 + (int)((pulledDirs * 60.0) / logDirectories.Count);
+                    StateHasChanged();
+
+                    var pullProgress = new Progress<string>(msg =>
+                    {
+                        zipProgress = $"Pulling {dirName}: {msg}";
+                        InvokeAsync(StateHasChanged);
+                    });
+
+                    var pullResult = await adbService.PullDirectoryAsync(logDir, localDestDir, selectedDevice.Id, pullProgress);
+
+                    if (!pullResult.IsSuccess)
+                    {
+                        logZipperError = $"Failed to pull logs from {dirName}: {pullResult.Error}";
+                        isZippingLogs = false;
+                        StateHasChanged();
+                        // Cleanup temp directory
+                        if (Directory.Exists(tempLogPath))
+                        {
+                            Directory.Delete(tempLogPath, true);
+                        }
+                        return;
+                    }
+
+                    pulledDirs++;
+                }
+
+                zipProgress = "Creating archive from pulled logs...";
+                zipPercentage = 80;
+                StateHasChanged();
+                await Task.Delay(300);
+
+                // Get NextUI version from device
+                var version = await GetNextUIVersionFromDevice();
+
+                // Sanitize version string for filename use
+                if (!string.IsNullOrEmpty(version))
+                {
+                    version = version.Replace(" ", "_")
+                                    .Replace("/", "_")
+                                    .Replace("\\", "_")
+                                    .Replace(":", "_")
+                                    .Replace("*", "_")
+                                    .Replace("?", "_")
+                                    .Replace("\"", "_")
+                                    .Replace("<", "_")
+                                    .Replace(">", "_")
+                                    .Replace("|", "_")
+                                    .Replace("\n", "_")
+                                    .Replace("\r", "_");
+                }
+
+                // Create the zip file
+                var cachePath = FileSystem.CacheDirectory;
+                var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                var zipFileName = string.IsNullOrEmpty(version)
+                    ? $"NextUI_logs_ADB_{timestamp}.zip"
+                    : $"NextUI_logs_ADB_{version}_{timestamp}.zip";
+                var zipFilePath = Path.Combine(cachePath, zipFileName);
+
+                using (var zip = ZipFile.Open(zipFilePath, ZipArchiveMode.Create))
+                {
+                    // Add all files from temp directory
+                    var allFiles = Directory.GetFiles(tempLogPath, "*", SearchOption.AllDirectories);
+                    foreach (var file in allFiles)
+                    {
+                        var relativePath = Path.GetRelativePath(tempLogPath, file);
+                        zip.CreateEntryFromFile(file, relativePath);
+                    }
+                }
+
+                zipProgress = "Archive created successfully!";
+                zipPercentage = 100;
+                StateHasChanged();
+                await Task.Delay(500);
+
+                zipCompleteMessage = $"Log archive created successfully!\n\nFile:\n{zipFileName}\n\nLocation:\n{cachePath}\n\nThe archive contains {logDirectories.Count} log directories pulled from device.";
+                isZippingLogs = false;
+                StateHasChanged();
+
+                // Cleanup temp directory
+                if (Directory.Exists(tempLogPath))
+                {
+                    Directory.Delete(tempLogPath, true);
+                }
+
+                // Automatically open the cache directory
+                await Utils.OpenDirectoryAsync(cachePath);
+            }
+            catch
+            {
+                // Cleanup temp directory on error
+                if (Directory.Exists(tempLogPath))
+                {
+                    try { Directory.Delete(tempLogPath, true); } catch { }
+                }
+                throw;
+            }
+        }
+        catch (Exception ex)
+        {
+            logZipperError = $"Failed to pull and create log archive: {ex.Message}";
+            isZippingLogs = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task<string?> GetNextUIVersionFromDevice()
+    {
+        if (adbService == null || selectedDevice == null)
+            return null;
+
+        try
+        {
+            // Try to pull version.txt from device
+            var versionFilePath = "/mnt/SDCARD/.system/version.txt";
+            var versionExists = await adbService.PathExistsAsync(versionFilePath, selectedDevice.Id);
+
+            if (versionExists)
+            {
+                var tempVersionFile = Path.Combine(Path.GetTempPath(), $"version_{Guid.NewGuid():N}.txt");
+                var pullResult = await adbService.PullFileAsync(versionFilePath, tempVersionFile, selectedDevice.Id);
+
+                if (pullResult.IsSuccess && File.Exists(tempVersionFile))
+                {
+                    try
+                    {
+                        var content = await File.ReadAllTextAsync(tempVersionFile);
+                        File.Delete(tempVersionFile);
+                        if (content.Contains("NextUI", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return content.Trim();
+                        }
+                    }
+                    catch
+                    {
+                        if (File.Exists(tempVersionFile))
+                        {
+                            try { File.Delete(tempVersionFile); } catch { }
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private async Task<string?> GetNextUIVersion(string sdCardPath)
     {
         try
@@ -389,9 +824,123 @@
             color: #d73a49;
         }
 
-    .sd-card-selection {
+    .mode-selection {
+        margin: 20px 0;
+    }
+
+    .mode-tabs {
+        display: flex;
+        background: #f6f8fa;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+
+    .tab-button {
+        flex: 1;
+        padding: 12px 16px;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        color: #586069;
+        transition: all 0.2s;
+    }
+
+        .tab-button:hover {
+            background: #e1e4e8;
+            color: #24292e;
+        }
+
+        .tab-button.active {
+            background: white;
+            color: #0366d6;
+            border-bottom: 2px solid #0366d6;
+            font-weight: 600;
+        }
+
+    .sd-card-selection, .adb-selection {
         margin-top: 20px;
     }
+
+    .device-selection {
+        margin: 15px 0;
+    }
+
+    .devices-list {
+        margin-top: 15px;
+    }
+
+    .device-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px;
+        background: white;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        margin-bottom: 8px;
+    }
+
+        .device-item.online {
+            border-color: #28a745;
+            background: #f8fff9;
+        }
+
+        .device-item.offline {
+            border-color: #dc3545;
+            background: #fff8f8;
+        }
+
+    .device-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .device-name {
+        font-weight: 600;
+        color: #24292e;
+    }
+
+    .device-status {
+        font-size: 14px;
+    }
+
+    .selected-device {
+        background: #e6fffa;
+        border: 1px solid #9ae6b4;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 15px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .warning-box {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        border-radius: 6px;
+        padding: 15px;
+        margin: 15px 0;
+        color: #856404;
+    }
+
+        .warning-box p {
+            margin: 0;
+        }
+
+    .warning-link {
+        color: #0366d6;
+        text-decoration: underline;
+        cursor: pointer;
+    }
+
+        .warning-link:hover {
+            color: #0056b3;
+        }
 
     .selected-path {
         background: #e6fffa;
