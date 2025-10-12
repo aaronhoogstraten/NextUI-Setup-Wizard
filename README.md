@@ -96,5 +96,14 @@ To export all the `.userdata` logs from an existing NextUI installation, click t
 <img width="533" height="466" alt="Screenshot 2025-09-21 150121" src="https://github.com/user-attachments/assets/c9283c1b-a595-4915-8f42-cdb091bd0f00" />
 
 ---
+## ADB Mode
+
+NextUI Setup Wizard also supports ADB Mode which allows a user to connect their NextUI compatible device to their PC via USB cable and perform all the above operations without needing to remove the SD card from the device.
+To access ADB Mode, click the wrench icon button in the top left and select ADB Mode:
+
+<img width="229" height="161" alt="Screenshot 2025-10-12 134731" src="https://github.com/user-attachments/assets/279d0eba-9686-4a42-9dc8-22d366d5e05c" />
+
+---
+
 ## Acknowledgements
 - K-Wall for their generous time given in helping test the macOS version.
