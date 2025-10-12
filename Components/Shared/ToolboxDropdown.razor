@@ -1,0 +1,179 @@
+@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<div class="toolbox-dropdown" @ref="dropdownRef">
+    <button class="toolbox-btn" @onclick="ToggleDropdown" @onclick:stopPropagation="true" title="Tools">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+        </svg>
+    </button>
+
+    @if (isDropdownOpen)
+    {
+        <div class="toolbox-dropdown-menu" @onclick:stopPropagation="true">
+            <div class="toolbox-dropdown-item" @onclick="ShowLogZipper">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                    <polyline points="14,2 14,8 20,8"/>
+                    <line x1="16" y1="13" x2="8" y2="13"/>
+                    <line x1="16" y1="17" x2="8" y2="17"/>
+                    <polyline points="10,9 9,9 8,9"/>
+                </svg>
+                <span>Log Zipper</span>
+            </div>
+            <div class="toolbox-dropdown-item" @onclick="GoToAdbMode">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/>
+                    <line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+                <span>ADB Mode</span>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .toolbox-dropdown {
+        position: relative;
+        display: inline-block;
+    }
+
+    .toolbox-btn {
+        background: #f6f8fa;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        padding: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.2s;
+    }
+
+    .toolbox-btn:hover {
+        background: #e9ecef;
+        border-color: #adb5bd;
+    }
+
+    .toolbox-btn svg {
+        color: #586069;
+    }
+
+    .toolbox-dropdown-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: white;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        min-width: 140px;
+        z-index: 9999;
+        margin-top: 4px;
+        overflow: hidden;
+    }
+
+    .toolbox-dropdown-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        cursor: pointer;
+        font-size: 14px;
+        color: #24292e;
+        transition: background-color 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .toolbox-dropdown-item:hover {
+        background-color: #f6f8fa;
+    }
+
+    .toolbox-dropdown-item:not(:last-child) {
+        border-bottom: 1px solid #e1e5e9;
+    }
+
+    .toolbox-dropdown-item svg {
+        color: #586069;
+        flex-shrink: 0;
+    }
+
+    .toolbox-dropdown-item span {
+        font-weight: 500;
+    }
+
+    @@media (max-width: 768px) {
+        .toolbox-dropdown-menu {
+            min-width: 120px;
+        }
+
+        .toolbox-dropdown-item {
+            padding: 12px 10px;
+            font-size: 13px;
+        }
+    }
+</style>
+
+@code {
+    [Parameter] public EventCallback OnLogZipperRequest { get; set; }
+
+    private bool isDropdownOpen = false;
+    private ElementReference dropdownRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && objRef != null)
+        {
+            await JSRuntime.InvokeVoidAsync("setupClickOutside", objRef);
+        }
+    }
+
+    private DotNetObjectReference<ToolboxDropdown>? objRef;
+
+    protected override void OnInitialized()
+    {
+        objRef = DotNetObjectReference.Create(this);
+    }
+
+    public void Dispose()
+    {
+        objRef?.Dispose();
+    }
+
+    [JSInvokable]
+    public void CloseDropdownFromJs()
+    {
+        CloseDropdown();
+    }
+
+    private void ToggleDropdown()
+    {
+        isDropdownOpen = !isDropdownOpen;
+        StateHasChanged();
+    }
+
+    private async Task ShowLogZipper()
+    {
+        isDropdownOpen = false;
+        StateHasChanged();
+        await OnLogZipperRequest.InvokeAsync();
+    }
+
+    private void GoToAdbMode()
+    {
+        isDropdownOpen = false;
+        StateHasChanged();
+        Navigation.NavigateTo("/adb-config");
+    }
+
+    public void CloseDropdown()
+    {
+        if (isDropdownOpen)
+        {
+            isDropdownOpen = false;
+            StateHasChanged();
+        }
+    }
+}

@@ -17,7 +17,7 @@ namespace NextUI_Setup_Wizard.Resources
         public static void LogImmediate(string message)
         {
             var timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-            var logLine = $"[{timestamp}] {message}";
+            var logLine = $"[{timestamp}] {message}{Environment.NewLine}";
             File.AppendAllText(LogPath, logLine);
         }
 

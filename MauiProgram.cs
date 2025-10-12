@@ -20,6 +20,15 @@ namespace NextUI_Setup_Wizard
 
             builder.Services.AddSingleton<HttpClient>();
 
+            // Register ADB services
+            builder.Services.AddSingleton<NextUI_Setup_Wizard.Resources.PlatformToolsExtractor>();
+            builder.Services.AddTransient<NextUI_Setup_Wizard.Resources.AdbService>(provider =>
+            {
+                var extractor = provider.GetRequiredService<NextUI_Setup_Wizard.Resources.PlatformToolsExtractor>();
+                return new NextUI_Setup_Wizard.Resources.AdbService(extractor.AdbExecutablePath);
+            });
+            builder.Services.AddTransient<NextUI_Setup_Wizard.Resources.AdbFileOperations>();
+
 #if DEBUG
     		builder.Services.AddBlazorWebViewDeveloperTools();
     		builder.Logging.AddDebug();
