@@ -107,3 +107,4 @@ To access ADB Mode, click the wrench icon button in the top left and select ADB 
 
 ## Acknowledgements
 - K-Wall for their generous time given in helping test the macOS version.
+- savant and frysee for their help providing feedback and testing ADB mode.
