@@ -553,13 +553,45 @@ namespace NextUI_Setup_Wizard.Resources
         }
 
         /// <summary>
-        /// Gets SHA1 hash by temporarily pulling the remote file and computing hash locally
+        /// Gets MD5 hash of a remote file on the device.
+        /// First attempts to use md5sum command on device (via BusyBox).
+        /// Falls back to pulling the file and computing hash locally if md5sum fails.
         /// </summary>
         /// <param name="remotePath">Remote path to the file</param>
         /// <param name="deviceId">Optional device ID if multiple devices</param>
-        /// <returns>SHA1 hash string or null if failed</returns>
-        public async Task<string?> GetRemoteFileSha1ByPullAsync(string remotePath, string? deviceId = null)
+        /// <returns>MD5 hash string or null if failed</returns>
+        public async Task<string?> GetRemoteFileMd5Async(string remotePath, string? deviceId = null)
         {
+            var deviceArg = !string.IsNullOrEmpty(deviceId) ? $"-s {deviceId}" : "";
+
+            // Try to use busybox md5sum on the device
+            try
+            {
+                var md5Command = $"{deviceArg} shell \"busybox md5sum \\\"{remotePath}\\\"\"".Trim();
+                var md5Result = await ExecuteAdbCommandAsync(md5Command, timeout: 10000);
+
+                if (md5Result.IsSuccess && !string.IsNullOrEmpty(md5Result.Output))
+                {
+                    // md5sum output format is typically: "hash  filename"
+                    // Extract the hash (first part before whitespace)
+                    var parts = md5Result.Output.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 0)
+                    {
+                        var hash = parts[0].Trim().ToLowerInvariant();
+                        // Validate that it looks like an MD5 hash (32 hex characters)
+                        if (hash.Length == 32 && System.Text.RegularExpressions.Regex.IsMatch(hash, "^[0-9a-f]{32}$"))
+                        {
+                            return hash;
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // If busybox md5sum fails, fall through to the pull method
+            }
+
+            // Fallback: Pull file and compute hash locally
             string? tempFilePath = null;
             try
             {
@@ -567,14 +599,13 @@ namespace NextUI_Setup_Wizard.Resources
                 tempFilePath = Path.Combine(Path.GetTempPath(), $"bios_hash_check_{Guid.NewGuid():N}.tmp");
 
                 // Pull file from device
-                var deviceArg = !string.IsNullOrEmpty(deviceId) ? $"-s {deviceId}" : "";
                 var pullCommand = $"{deviceArg} pull \"{remotePath}\" \"{tempFilePath}\"".Trim();
                 var pullResult = await ExecuteAdbCommandAsync(pullCommand);
 
                 if (pullResult.IsSuccess && File.Exists(tempFilePath))
                 {
                     // Compute hash of temporary file
-                    return await GetLocalFileSha1Async(tempFilePath);
+                    return await GetLocalFileMd5Async(tempFilePath);
                 }
 
                 return null;
@@ -620,6 +651,78 @@ namespace NextUI_Setup_Wizard.Resources
             catch
             {
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Computes MD5 hash for a local file
+        /// </summary>
+        /// <param name="filePath">Path to local file</param>
+        /// <returns>MD5 hash string or null if failed</returns>
+        public static async Task<string?> GetLocalFileMd5Async(string filePath)
+        {
+            try
+            {
+                if (!File.Exists(filePath))
+                    return null;
+
+                using var md5 = System.Security.Cryptography.MD5.Create();
+                using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
+                var hashBytes = await Task.Run(() => md5.ComputeHash(fileStream));
+                return Convert.ToHexString(hashBytes).ToLowerInvariant();
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Gets SHA1 hash of a remote file on the device by pulling it locally.
+        /// This method always pulls the file and computes hash locally.
+        /// </summary>
+        /// <param name="remotePath">Remote path to the file</param>
+        /// <param name="deviceId">Optional device ID if multiple devices</param>
+        /// <returns>SHA1 hash string or null if failed</returns>
+        public async Task<string?> GetRemoteFileSha1ByPullAsync(string remotePath, string? deviceId = null)
+        {
+            var deviceArg = !string.IsNullOrEmpty(deviceId) ? $"-s {deviceId}" : "";
+            string? tempFilePath = null;
+            try
+            {
+                // Create temporary file
+                tempFilePath = Path.Combine(Path.GetTempPath(), $"bios_hash_check_{Guid.NewGuid():N}.tmp");
+
+                // Pull file from device
+                var pullCommand = $"{deviceArg} pull \"{remotePath}\" \"{tempFilePath}\"".Trim();
+                var pullResult = await ExecuteAdbCommandAsync(pullCommand);
+
+                if (pullResult.IsSuccess && File.Exists(tempFilePath))
+                {
+                    // Compute hash of temporary file
+                    return await GetLocalFileSha1Async(tempFilePath);
+                }
+
+                return null;
+            }
+            catch
+            {
+                return null;
+            }
+            finally
+            {
+                // Clean up temporary file
+                if (!string.IsNullOrEmpty(tempFilePath) && File.Exists(tempFilePath))
+                {
+                    try
+                    {
+                        File.Delete(tempFilePath);
+                    }
+                    catch
+                    {
+                        // Ignore cleanup failures
+                    }
+                }
             }
         }
     }

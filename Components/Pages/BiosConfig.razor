@@ -76,9 +76,18 @@
                         <div class="bios-file-group">
                             <div class="bios-file-row">
                                 <div class="file-info">
-                                    <div class="file-name-hash-row">
+                                    <div class="file-name-row">
                                         <span class="file-name">@biosGroup.Key</span>
-                                        <span class="file-hash">(sha1:@biosGroup.First().Sha1)</span>
+                                    </div>
+                                    <div class="file-hashes-row">
+                                        @if (!string.IsNullOrEmpty(biosGroup.First().Md5))
+                                        {
+                                            <span class="file-hash">(md5:@biosGroup.First().Md5)</span>
+                                        }
+                                        @if (!string.IsNullOrEmpty(biosGroup.First().Sha1))
+                                        {
+                                            <span class="file-hash">(sha1:@biosGroup.First().Sha1)</span>
+                                        }
                                     </div>
                                     <div class="file-paths">
                                         @foreach (var biosFile in biosGroup)
@@ -292,13 +301,13 @@
         display: flex;
         flex-direction: column;
         gap: 4px;
+        min-width: 0; /* Allow flex item to shrink below content size */
+        overflow: hidden;
     }
 
-    .file-name-hash-row {
-        flex: 1;
+    .file-name-row {
         display: flex;
         flex-direction: row;
-        gap: 4px;
     }
 
     .file-name {
@@ -308,13 +317,20 @@
         font-family: 'SFMono-Regular', Consolas, monospace;
     }
 
+    .file-hashes-row {
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+        flex-wrap: nowrap;
+    }
+
     .file-hash {
         display: inline-flex;
         font-weight: 100;
-        color: #24292e;
+        color: #6a737d;
         font-family: 'SFMono-Regular', Consolas, monospace;
-        font-size: 80%;
-        align-self: safe center;
+        font-size: 75%;
+        white-space: nowrap;
     }
 
     .file-paths {
@@ -750,6 +766,7 @@
                         FileName = "disksys.rom",
                         SystemCode = "FC",
                         Sha1 = "57fe1bdee955bb48d357e463ccbf129496930b62",
+                        Md5 = "ca30b50f880eb660a320674ed365ef7a"
                     }
                 },
                 isAdbMode
@@ -765,6 +782,7 @@
                         FileName = "gb_bios.bin",
                         SystemCode = "GB",
                         Sha1 = "4ed31ec6b0b175bb109c0eb5fd3d193da823339f",
+                        Md5 = "32fbbd84168d3482956eb3c5051637f5"
                     }
                 },
                 isAdbMode
@@ -780,6 +798,7 @@
                         FileName = "gbc_bios.bin",
                         SystemCode = "GBC",
                         Sha1 = "1293d68bf9643bc4f36954c1e80e38f39864528d",
+                        Md5 = "dbfce9db9deaa2567f6a84fde55f9680"
                     }
                 },
                 isAdbMode
@@ -795,12 +814,14 @@
                         FileName = "gba_bios.bin",
                         SystemCode = "GBA",
                         Sha1 = "300c20df6731a33952ded8c436f7f186d25d3492",
+                        Md5 = "a860e8c0b6d573d191e4ec7db1b1e4f6"
                     },
                     new BiosFile
                     {
                         FileName = "gba_bios.bin",
                         SystemCode = "MGBA",
                         Sha1 = "300c20df6731a33952ded8c436f7f186d25d3492",
+                        Md5 = "a860e8c0b6d573d191e4ec7db1b1e4f6"
                     }
                 },
                 isAdbMode
@@ -816,36 +837,42 @@
                         FileName = "bios_CD_E.bin",
                         SystemCode = "MD",
                         Sha1 = "f891e0ea651e2232af0c5c4cb46a0cae2ee8f356",
+                        Md5 = "e66fa1dc5820d254611fdcdba0662372"
                     },
                     new BiosFile
                     {
                         FileName = "bios_CD_J.bin",
                         SystemCode = "MD",
                         Sha1 = "4846f448160059a7da0215a5df12ca160f26dd69",
+                        Md5 = "278a9397d192149e84e820ac621a8edd"
                     },
                     new BiosFile
                     {
                         FileName = "bios_CD_U.bin",
                         SystemCode = "MD",
                         Sha1 = "f4f315adcef9b8feb0364c21ab7f0eaf5457f3ed",
+                        Md5 = "2efd74e3232ff260e371b99f84024f7f"
                     },
                     new BiosFile
                     {
                         FileName = "bios_CD_E.bin",
                         SystemCode = "SEGACD",
                         Sha1 = "f891e0ea651e2232af0c5c4cb46a0cae2ee8f356",
+                        Md5 = "e66fa1dc5820d254611fdcdba0662372"
                     },
                     new BiosFile
                     {
                         FileName = "bios_CD_J.bin",
                         SystemCode = "SEGACD",
                         Sha1 = "4846f448160059a7da0215a5df12ca160f26dd69",
+                        Md5 = "278a9397d192149e84e820ac621a8edd"
                     },
                     new BiosFile
                     {
                         FileName = "bios_CD_U.bin",
                         SystemCode = "SEGACD",
                         Sha1 = "f4f315adcef9b8feb0364c21ab7f0eaf5457f3ed",
+                        Md5 = "2efd74e3232ff260e371b99f84024f7f"
                     }
                 },
                 isAdbMode
@@ -861,6 +888,7 @@
                         FileName = "syscard3.pce",
                         SystemCode = "PCE",
                         Sha1 = "79f5ff55dd10187c7fd7b8daab0b3ffbd1f56a2c",
+                        Md5 = "38179df8f4ac870017db21ebcbf53114"
                     }
                 },
                 isAdbMode
@@ -876,6 +904,7 @@
                         FileName = "psxonpsp660.bin",
                         SystemCode = "PS",
                         Sha1 = "96880d1ca92a016ff054be5159bb06fe03cb4e14",
+                        Md5 = "c53ca5908936d412331790f4426c6c33"
                     }
                 },
                 isAdbMode
@@ -891,6 +920,7 @@
                         FileName = "neogeo.zip",
                         SystemCode = "FBN",
                         Sha1 = "deb62b0074b8cae4f162c257662136733cfc76ad",
+                        Md5 = "00dad01abdbf8ea9e79ad2fe11bdb182",
                         IsRomFile = true
                     }
                 },
@@ -918,10 +948,24 @@
 
                         if (biosFile.ExistsOnTarget)
                         {
-                            // Get SHA1 hash of existing file
-                            biosFile.ActualSha1 = await adbService.GetRemoteFileSha1ByPullAsync(devicePath, selectedDevice?.Id);
-                            biosFile.IsValidHash = !string.IsNullOrEmpty(biosFile.ActualSha1) &&
-                                biosFile.ActualSha1.Equals(biosFile.Sha1, StringComparison.OrdinalIgnoreCase);
+                            // Get MD5 hash of existing file (preferred method for ADB - fast via busybox)
+                            biosFile.ActualMd5 = await adbService.GetRemoteFileMd5Async(devicePath, selectedDevice?.Id);
+
+                            // Check if MD5 is valid
+                            var md5Valid = !string.IsNullOrEmpty(biosFile.Md5) && !string.IsNullOrEmpty(biosFile.ActualMd5) &&
+                                biosFile.ActualMd5.Equals(biosFile.Md5, StringComparison.OrdinalIgnoreCase);
+
+                            // Only pull file for SHA1 verification if MD5 doesn't match or isn't available
+                            var sha1Valid = false;
+                            if (!md5Valid && !string.IsNullOrEmpty(biosFile.Sha1))
+                            {
+                                biosFile.ActualSha1 = await adbService.GetRemoteFileSha1ByPullAsync(devicePath, selectedDevice?.Id);
+                                sha1Valid = !string.IsNullOrEmpty(biosFile.ActualSha1) &&
+                                    biosFile.ActualSha1.Equals(biosFile.Sha1, StringComparison.OrdinalIgnoreCase);
+                            }
+
+                            // File is valid if either hash matches
+                            biosFile.IsValidHash = md5Valid || sha1Valid;
                         }
                     }
                     else
@@ -932,10 +976,20 @@
 
                         if (biosFile.ExistsOnTarget)
                         {
+                            // Get MD5 hash of existing file
+                            biosFile.ActualMd5 = await AdbService.GetLocalFileMd5Async(localPath);
+
                             // Get SHA1 hash of existing file
                             biosFile.ActualSha1 = await AdbService.GetLocalFileSha1Async(localPath);
-                            biosFile.IsValidHash = !string.IsNullOrEmpty(biosFile.ActualSha1) &&
+
+                            // Validate against expected hashes (check both if available)
+                            var md5Valid = !string.IsNullOrEmpty(biosFile.Md5) && !string.IsNullOrEmpty(biosFile.ActualMd5) &&
+                                biosFile.ActualMd5.Equals(biosFile.Md5, StringComparison.OrdinalIgnoreCase);
+                            var sha1Valid = !string.IsNullOrEmpty(biosFile.Sha1) && !string.IsNullOrEmpty(biosFile.ActualSha1) &&
                                 biosFile.ActualSha1.Equals(biosFile.Sha1, StringComparison.OrdinalIgnoreCase);
+
+                            // File is valid if either hash matches (or if only one hash type is defined)
+                            biosFile.IsValidHash = md5Valid || sha1Valid;
                         }
                     }
                 }
@@ -1377,9 +1431,11 @@
         public string DevicePath { get; set; } = "";
         public string SelectedPath { get; set; } = "";
         public string Sha1 { get; set; } = "";
+        public string Md5 { get; set; } = "";
         public bool ExistsOnTarget { get; set; } = false;
         public bool IsValidHash { get; set; } = false;
         public string? ActualSha1 { get; set; }
+        public string? ActualMd5 { get; set; }
         public string? CustomPath { get; set; } // Custom path override for files that don't go in standard BIOS location
         public bool IsRomFile { get; set; } = false; // Indicates this "BIOS" file actually goes in the ROM directory
     }
