@@ -567,7 +567,7 @@ namespace NextUI_Setup_Wizard.Resources
             // Try to use busybox md5sum on the device
             try
             {
-                var md5Command = $"{deviceArg} shell \"busybox md5sum \\\"{remotePath}\\\"\"".Trim();
+                var md5Command = $"{deviceArg} shell \"md5sum \\\"{remotePath}\\\"\"".Trim();
                 var md5Result = await ExecuteAdbCommandAsync(md5Command, timeout: 10000);
 
                 if (md5Result.IsSuccess && !string.IsNullOrEmpty(md5Result.Output))
