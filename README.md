@@ -98,7 +98,7 @@ To export all the `.userdata` logs from an existing NextUI installation, click t
 ---
 ## ADB Mode
 
-NextUI Setup Wizard also supports ADB Mode which allows a user to connect their NextUI compatible device to their PC via USB cable and perform all the above operations without needing to remove the SD card from the device.
+NextUI Setup Wizard also supports ADB Mode which allows a user to connect their NextUI compatible device to their PC via USB cable and perform the BIOS and Rom configuration steps on an existing NextUI installation without needing to remove the SD card from the device.
 To access ADB Mode, click the wrench icon button in the top left and select ADB Mode:
 
 <img width="229" height="161" alt="Screenshot 2025-10-12 134731" src="https://github.com/user-attachments/assets/279d0eba-9686-4a42-9dc8-22d366d5e05c" />
