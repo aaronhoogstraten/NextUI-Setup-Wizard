@@ -67,10 +67,17 @@ jobs:
         Write-Host "Run script created at: $scriptPath"
         Write-Host ""
         
+    - name: Prepare artifacts folder
+      run: |
+        $artifactName = "NextUI-Setup-Wizard-Windows-${{ inputs.tag || 'latest' }}"
+        Write-Host "Preparing artifacts in folder: $artifactName"
+        New-Item -ItemType Directory -Force -Path "artifacts\$artifactName"
+        Copy-Item -Path "bin\Release\net9.0-windows10.0.19041.0\*" -Destination "artifacts\$artifactName" -Recurse
+
     - name: Upload artifacts
       id: upload
       uses: actions/upload-artifact@v4
       with:
         name: NextUI-Setup-Wizard-Windows-${{ inputs.tag || 'latest' }}
-        path: bin\Release\net9.0-windows10.0.19041.0\*
+        path: artifacts\NextUI-Setup-Wizard-Windows-${{ inputs.tag || 'latest' }}
         retention-days: 30
