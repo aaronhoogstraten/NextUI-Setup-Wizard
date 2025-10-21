@@ -79,5 +79,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: NextUI-Setup-Wizard-Windows-${{ inputs.tag || 'latest' }}
-        path: artifacts\NextUI-Setup-Wizard-Windows-${{ inputs.tag || 'latest' }}
+        path: artifacts\
         retention-days: 30
