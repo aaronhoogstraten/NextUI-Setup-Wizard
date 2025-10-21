@@ -67,17 +67,10 @@ jobs:
         Write-Host "Run script created at: $scriptPath"
         Write-Host ""
         
-    - name: Create ZIP archive
-      run: |
-        $sourceDir = "bin\Release\net9.0-windows10.0.19041.0"
-        $zipName = "NextUI-Setup-Wizard-Windows-${{ inputs.tag || 'latest' }}.zip"
-        Compress-Archive -Path "$sourceDir\*" -DestinationPath $zipName
-        Write-Host "Created ZIP: $zipName"
-
     - name: Upload artifacts
       id: upload
       uses: actions/upload-artifact@v4
       with:
         name: NextUI-Setup-Wizard-Windows-${{ inputs.tag || 'latest' }}
-        path: "NextUI-Setup-Wizard-Windows-${{ inputs.tag || 'latest' }}.zip"
+        path: bin\Release\net9.0-windows10.0.19041.0\*
         retention-days: 30

@@ -54,17 +54,10 @@ jobs:
             -p:CommitHash="${{ steps.commit.outputs.hash }}" \
             -o ./publish/macos-arm64
 
-      - name: Create macOS ZIP
-        run: |
-          cd ./publish/macos-arm64
-          zip -r "../../NextUI-Setup-Wizard-macOS-${{ inputs.tag || 'latest' }}.zip" ./*
-          cd ../..
-          echo "Created ZIP: NextUI-Setup-Wizard-macOS-${{ inputs.tag || 'latest' }}.zip"
-
       - name: Upload macOS ARM64 build artifacts
         id: upload
         uses: actions/upload-artifact@v4
         with:
           name: NextUI-Setup-Wizard-macOS-${{ inputs.tag || 'latest' }}
-          path: "NextUI-Setup-Wizard-macOS-${{ inputs.tag || 'latest' }}.zip"
+          path: ./publish/macos-arm64/*
           retention-days: 30
