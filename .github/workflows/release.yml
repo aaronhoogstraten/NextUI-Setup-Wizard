@@ -61,13 +61,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: NextUI-Setup-Wizard-Windows-${{ needs.create-tag.outputs.tag }}
-          path: ./artifacts
+          path: ./windows-artifacts
 
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4
         with:
           name: NextUI-Setup-Wizard-macOS-${{ needs.create-tag.outputs.tag }}
-          path: ./artifacts
+          path: ./macos-artifacts
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -116,8 +116,8 @@ jobs:
 
               4. The app is now saved as an exception to your security settings, and you can open it in the future by double-clicking it, just as you can any authorized app.
           files: |
-            ./artifacts/NextUI-Setup-Wizard-Windows-${{ needs.create-tag.outputs.tag }}.zip
-            ./artifacts/NextUI-Setup-Wizard-macOS-${{ needs.create-tag.outputs.tag }}.zip
+            ./windows-artifacts/**/*
+            ./macos-artifacts/**/*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -57,10 +57,17 @@ jobs:
             -p:CommitHash="${{ steps.commit.outputs.hash }}" \
             -o ./publish/macos-arm64
 
+      - name: Prepare artifacts folder
+        run: |
+          ARTIFACT_NAME="NextUI-Setup-Wizard-macOS-${{ inputs.tag || 'latest' }}"
+          echo "Preparing artifacts in folder: $ARTIFACT_NAME"
+          mkdir -p "artifacts/$ARTIFACT_NAME"
+          cp -r ./publish/macos-arm64/* "artifacts/$ARTIFACT_NAME/"
+
       - name: Upload macOS ARM64 build artifacts
         id: upload
         uses: actions/upload-artifact@v4
         with:
           name: NextUI-Setup-Wizard-macOS-${{ inputs.tag || 'latest' }}
-          path: ./publish/macos-arm64/*
+          path: ./artifacts/
           retention-days: 30
