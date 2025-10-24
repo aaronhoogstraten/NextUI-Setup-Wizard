@@ -116,8 +116,8 @@ jobs:
 
               4. The app is now saved as an exception to your security settings, and you can open it in the future by double-clicking it, just as you can any authorized app.
           files: |
-            ./windows-artifacts/**/*
-            ./macos-artifacts/**/*
+            ./windows-artifacts/NextUI-Setup-Wizard-Windows-${{ needs.create-tag.outputs.tag }}
+            ./macos-artifacts/NextUI-Setup-Wizard-macOS-${{ needs.create-tag.outputs.tag }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
