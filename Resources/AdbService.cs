@@ -400,7 +400,7 @@ namespace NextUI_Setup_Wizard.Resources
         /// <summary>
         /// Executes an ADB command
         /// </summary>
-        private Task<AdbResult> ExecuteAdbCommandAsync(
+        private async Task<AdbResult> ExecuteAdbCommandAsync(
             string arguments,
             IProgress<string>? progress = null,
             CancellationToken cancellationToken = default,
@@ -460,18 +460,46 @@ namespace NextUI_Setup_Wizard.Resources
                 process.BeginErrorReadLine();
 
                 var timeoutMs = timeout ?? _defaultTimeoutMs;
-                process.WaitForExit(timeoutMs);
-                var completed = process.HasExited;
+
+                // Use async wait with cancellation token for proper async/await pattern
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(timeoutMs);
+
+                bool completed;
+                try
+                {
+                    await process.WaitForExitAsync(cts.Token);
+                    completed = true;
+                }
+                catch (OperationCanceledException)
+                {
+                    completed = false;
+                }
 
                 var executionTime = DateTime.Now - commandStartTime;
 
                 if (!completed)
                 {
-                    process.Kill();
+                    try
+                    {
+                        process.Kill();
 
-                    // Wait for process cleanup after kill (max 1 second)
-                    // This ensures proper resource disposal
-                    process.WaitForExit(1000);
+                        // Wait for process cleanup after kill (max 1 second)
+                        // This ensures proper resource disposal
+                        using var cleanupCts = new CancellationTokenSource(1000);
+                        try
+                        {
+                            await process.WaitForExitAsync(cleanupCts.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // Process didn't exit cleanly within timeout
+                        }
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // Process already exited
+                    }
 
                     var timeoutResult = new AdbResult { IsSuccess = false, Error = "Command timed out" };
 
@@ -689,7 +717,8 @@ namespace NextUI_Setup_Wizard.Resources
 
                 using var sha1 = SHA1.Create();
                 using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
-                var hashBytes = await Task.Run(() => sha1.ComputeHash(fileStream));
+                // FileStream is already configured for async, no need for Task.Run
+                var hashBytes = sha1.ComputeHash(fileStream);
                 return Convert.ToHexString(hashBytes).ToLowerInvariant();
             }
             catch (Exception ex)
@@ -713,7 +742,8 @@ namespace NextUI_Setup_Wizard.Resources
 
                 using var md5 = System.Security.Cryptography.MD5.Create();
                 using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
-                var hashBytes = await Task.Run(() => md5.ComputeHash(fileStream));
+                // FileStream is already configured for async, no need for Task.Run
+                var hashBytes = md5.ComputeHash(fileStream);
                 return Convert.ToHexString(hashBytes).ToLowerInvariant();
             }
             catch (Exception ex)
