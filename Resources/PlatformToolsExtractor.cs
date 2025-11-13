@@ -92,8 +92,9 @@ namespace NextUI_Setup_Wizard.Resources
                 // Could add other auto-detection logic here for different platforms/package managers
                 return false;
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to auto-detect existing platform-tools installation: {ex.Message}");
                 return false;
             }
         }
@@ -120,8 +121,9 @@ namespace NextUI_Setup_Wizard.Resources
                 _usingExistingPath = true;
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to set existing platform-tools path '{existingPath}': {ex.Message}");
                 return false;
             }
         }
@@ -229,6 +231,7 @@ namespace NextUI_Setup_Wizard.Resources
             }
             catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to set executable permissions: {ex.Message}");
                 Console.WriteLine($"Failed to set executable permissions: {ex.Message}");
             }
         }
@@ -247,6 +250,7 @@ namespace NextUI_Setup_Wizard.Resources
             }
             catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to clean up platform-tools: {ex.Message}");
                 Console.WriteLine($"Failed to clean up platform-tools: {ex.Message}");
             }
         }
@@ -265,8 +269,9 @@ namespace NextUI_Setup_Wizard.Resources
                 var directoryInfo = new DirectoryInfo(_extractionPath);
                 return GetDirectorySize(directoryInfo);
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to get platform-tools size: {ex.Message}");
                 return 0;
             }
         }
@@ -292,9 +297,10 @@ namespace NextUI_Setup_Wizard.Resources
                     size += GetDirectorySize(subdirectoryInfo);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore access denied errors
+                // Log access denied and other errors but continue
+                Logger.LogImmediate($"Error accessing directory during size calculation: {ex.Message}");
             }
 
             return size;
@@ -333,8 +339,9 @@ namespace NextUI_Setup_Wizard.Resources
 
                 return hasAdb && hasPlatformToolsDir;
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to validate platform-tools zip '{zipPath}': {ex.Message}");
                 return false;
             }
         }

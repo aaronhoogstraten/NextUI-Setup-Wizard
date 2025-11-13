@@ -38,8 +38,9 @@ namespace NextUI_Setup_Wizard.Resources
                 var result = await ExecuteAdbCommandAsync("version", timeout: 5000);
                 return result.IsSuccess && result.Output.Contains("Android Debug Bridge");
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"ADB availability check failed: {ex.Message}");
                 return false;
             }
         }
@@ -336,8 +337,9 @@ namespace NextUI_Setup_Wizard.Resources
                 var result = await ExecuteAdbCommandAsync(command);
                 return result.IsSuccess && result.Output.Contains("EXISTS");
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"PathExists check failed for '{remotePath}': {ex.Message}");
                 return false;
             }
         }
@@ -611,9 +613,10 @@ namespace NextUI_Setup_Wizard.Resources
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
                 // If busybox md5sum fails, fall through to the pull method
+                Logger.LogImmediate($"Device-side MD5 calculation failed for '{remotePath}', falling back to pull method: {ex.Message}");
             }
 
             // Fallback: Pull file and compute hash locally
@@ -635,8 +638,9 @@ namespace NextUI_Setup_Wizard.Resources
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to pull file for MD5 hash calculation '{remotePath}': {ex.Message}");
                 return null;
             }
             finally
@@ -648,9 +652,10 @@ namespace NextUI_Setup_Wizard.Resources
                     {
                         File.Delete(tempFilePath);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Ignore cleanup failures
+                        // Log but don't fail on cleanup errors
+                        Logger.LogImmediate($"Failed to delete temporary file '{tempFilePath}': {ex.Message}");
                     }
                 }
             }
@@ -673,8 +678,9 @@ namespace NextUI_Setup_Wizard.Resources
                 var hashBytes = await Task.Run(() => sha1.ComputeHash(fileStream));
                 return Convert.ToHexString(hashBytes).ToLowerInvariant();
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to compute SHA1 hash for '{filePath}': {ex.Message}");
                 return null;
             }
         }
@@ -696,8 +702,9 @@ namespace NextUI_Setup_Wizard.Resources
                 var hashBytes = await Task.Run(() => md5.ComputeHash(fileStream));
                 return Convert.ToHexString(hashBytes).ToLowerInvariant();
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to compute MD5 hash for '{filePath}': {ex.Message}");
                 return null;
             }
         }
@@ -730,8 +737,9 @@ namespace NextUI_Setup_Wizard.Resources
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to pull file for SHA1 hash calculation '{remotePath}': {ex.Message}");
                 return null;
             }
             finally
@@ -743,9 +751,10 @@ namespace NextUI_Setup_Wizard.Resources
                     {
                         File.Delete(tempFilePath);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Ignore cleanup failures
+                        // Log but don't fail on cleanup errors
+                        Logger.LogImmediate($"Failed to delete temporary file '{tempFilePath}': {ex.Message}");
                     }
                 }
             }

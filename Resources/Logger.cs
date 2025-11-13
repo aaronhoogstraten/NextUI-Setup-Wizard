@@ -36,8 +36,10 @@ namespace NextUI_Setup_Wizard.Resources
                     File.AppendAllText(LogPath, _messages.ToString());
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // Can't log to file since logging failed, write to console instead
+                Console.WriteLine($"Failed to flush log messages to file: {ex.Message}");
             }
         }
 
@@ -65,9 +67,10 @@ namespace NextUI_Setup_Wizard.Resources
                     File.Move(currentLogPath, prevLogPath);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Ignore rotation errors to prevent app startup failures
+                // Don't fail app startup on log rotation errors, but log to console
+                Console.WriteLine($"Failed to rotate log files: {ex.Message}");
             }
         }
     }

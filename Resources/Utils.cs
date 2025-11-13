@@ -41,8 +41,9 @@ namespace NextUI_Setup_Wizard.Resources
                 if (!didOpen)
                     await Launcher.OpenAsync(directoryPath);
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to open directory '{directoryPath}': {ex.Message}");
             }
         }
 
