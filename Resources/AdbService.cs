@@ -364,11 +364,15 @@ namespace NextUI_Setup_Wizard.Resources
                 if (lines.Length < 2)
                     return null;
 
-                var dataLine = lines.LastOrDefault(l => l.Contains(AdbFileOperations.NEXTUI_BASE_PATH) || l.Contains("storage") || !l.StartsWith("Filesystem"));
+                // Find the data line (not the header)
+                var dataLine = lines.LastOrDefault(l => l != null && (l.Contains(AdbFileOperations.NEXTUI_BASE_PATH) || l.Contains("storage") || !l.StartsWith("Filesystem")));
                 if (string.IsNullOrEmpty(dataLine))
                     return null;
 
                 var parts = dataLine.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts == null || parts.Length < 4)
+                    return null;
+
                 if (parts.Length >= 4)
                 {
                     if (long.TryParse(parts[1], out var totalKb) &&
@@ -550,10 +554,20 @@ namespace NextUI_Setup_Wizard.Resources
         /// </summary>
         private static void ParseDeviceProperties(AdbDevice device, string properties)
         {
+            if (string.IsNullOrEmpty(properties))
+                return;
+
             var pairs = properties.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (pairs == null)
+                return;
+
             foreach (var pair in pairs)
             {
+                if (string.IsNullOrEmpty(pair))
+                    continue;
+
                 var colonIndex = pair.IndexOf(':');
+                // Ensure there's content before and after the colon
                 if (colonIndex > 0 && colonIndex < pair.Length - 1)
                 {
                     var key = pair.Substring(0, colonIndex);
@@ -602,7 +616,7 @@ namespace NextUI_Setup_Wizard.Resources
                     // md5sum output format is typically: "hash  filename"
                     // Extract the hash (first part before whitespace)
                     var parts = md5Result.Output.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length > 0)
+                    if (parts != null && parts.Length > 0)
                     {
                         var hash = parts[0].Trim().ToLowerInvariant();
                         // Validate that it looks like an MD5 hash (32 hex characters)
