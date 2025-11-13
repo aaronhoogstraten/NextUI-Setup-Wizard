@@ -57,14 +57,48 @@ namespace NextUI_Setup_Wizard.Resources
                 // If current log exists, rotate it
                 if (File.Exists(currentLogPath))
                 {
-                    // Delete old -prev log if it exists
+                    // Delete old -prev log if it exists (with retry for transient failures)
                     if (File.Exists(prevLogPath))
                     {
-                        File.Delete(prevLogPath);
+                        try
+                        {
+                            File.Delete(prevLogPath);
+                        }
+                        catch (IOException ex)
+                        {
+                            // If deletion fails (file locked, etc.), try to overwrite instead
+                            Console.WriteLine($"Could not delete previous log file: {ex.Message}");
+                        }
                     }
 
-                    // Move current log to -prev
-                    File.Move(currentLogPath, prevLogPath);
+                    // Move current log to -prev (with overwrite to handle race conditions)
+                    try
+                    {
+                        File.Move(currentLogPath, prevLogPath, overwrite: true);
+                    }
+                    catch (IOException ex)
+                    {
+                        // If move fails, try copy and delete as fallback
+                        Console.WriteLine($"Could not move log file, trying copy instead: {ex.Message}");
+                        try
+                        {
+                            File.Copy(currentLogPath, prevLogPath, overwrite: true);
+                            File.Delete(currentLogPath);
+                        }
+                        catch (Exception copyEx)
+                        {
+                            Console.WriteLine($"Could not copy/delete log file: {copyEx.Message}");
+                            // If all else fails, just delete the current log to start fresh
+                            try
+                            {
+                                File.Delete(currentLogPath);
+                            }
+                            catch
+                            {
+                                // Give up - we tried our best
+                            }
+                        }
+                    }
                 }
             }
             catch (Exception ex)
