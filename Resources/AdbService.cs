@@ -249,7 +249,8 @@ namespace NextUI_Setup_Wizard.Resources
                 // Use ls with -1 to force one entry per line and --color=never to prevent ANSI color codes
                 // If directoriesOnly is true, use -d */ to list only directories
                 var listCommand = directoriesOnly ? "ls -1 -d --color=never */" : "ls -1 --color=never";
-                var command = $"{deviceArg} shell \"cd \\\"{remotePath}\\\" && {listCommand}\"".Trim();
+                var escapedPath = EscapeShellArgument(remotePath);
+                var command = $"{deviceArg} shell \"cd {escapedPath} && {listCommand}\"".Trim();
 
                 var result = await ExecuteAdbCommandAsync(command);
 
@@ -301,6 +302,24 @@ namespace NextUI_Setup_Wizard.Resources
         }
 
         /// <summary>
+        /// Escapes a string for safe use in shell commands.
+        /// Uses single quotes and escapes any single quotes within the string.
+        /// This prevents shell injection attacks.
+        /// </summary>
+        /// <param name="input">The string to escape</param>
+        /// <returns>A shell-safe escaped string</returns>
+        private static string EscapeShellArgument(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return "''";
+
+            // Replace single quotes with '\'' (end quote, escaped quote, start quote)
+            // Then wrap the entire string in single quotes
+            // This is the safest method for POSIX shell escaping
+            return "'" + input.Replace("'", "'\\''") + "'";
+        }
+
+        /// <summary>
         /// Checks if a file or directory exists on the device
         /// </summary>
         /// <param name="remotePath">Remote path to check</param>
@@ -310,9 +329,9 @@ namespace NextUI_Setup_Wizard.Resources
             try
             {
                 var deviceArg = !string.IsNullOrEmpty(deviceId) ? $"-s {deviceId}" : "";
-                // Escape special characters in the path for shell
-                var escapedPath = remotePath.Replace("(", "\\(").Replace(")", "\\)");
-                var command = $"{deviceArg} shell test -e \"{escapedPath}\" && echo \"EXISTS\" || echo \"NOT_EXISTS\"".Trim();
+                // Properly escape the path for shell to prevent injection attacks
+                var escapedPath = EscapeShellArgument(remotePath);
+                var command = $"{deviceArg} shell test -e {escapedPath} && echo \"EXISTS\" || echo \"NOT_EXISTS\"".Trim();
 
                 var result = await ExecuteAdbCommandAsync(command);
                 return result.IsSuccess && result.Output.Contains("EXISTS");
@@ -567,7 +586,8 @@ namespace NextUI_Setup_Wizard.Resources
             // Try to use busybox md5sum on the device
             try
             {
-                var md5Command = $"{deviceArg} shell \"md5sum \\\"{remotePath}\\\"\"".Trim();
+                var escapedPath = EscapeShellArgument(remotePath);
+                var md5Command = $"{deviceArg} shell \"md5sum {escapedPath}\"".Trim();
                 var md5Result = await ExecuteAdbCommandAsync(md5Command, timeout: 10000);
 
                 if (md5Result.IsSuccess && !string.IsNullOrEmpty(md5Result.Output))
