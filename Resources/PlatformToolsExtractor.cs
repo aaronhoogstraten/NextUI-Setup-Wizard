@@ -211,7 +211,7 @@ namespace NextUI_Setup_Wizard.Resources
                         fileName == "aidl" || fileName == "dexdump" || fileName == "split-select" ||
                         fileName.StartsWith("lib") || !Path.HasExtension(fileName))
                     {
-                        var process = new System.Diagnostics.Process
+                        using var process = new System.Diagnostics.Process
                         {
                             StartInfo = new System.Diagnostics.ProcessStartInfo
                             {

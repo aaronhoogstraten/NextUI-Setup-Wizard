@@ -462,6 +462,11 @@ namespace NextUI_Setup_Wizard.Resources
                 if (!completed)
                 {
                     process.Kill();
+
+                    // Wait for process cleanup after kill (max 1 second)
+                    // This ensures proper resource disposal
+                    process.WaitForExit(1000);
+
                     var timeoutResult = new AdbResult { IsSuccess = false, Error = "Command timed out" };
 
                     // Log timeout
