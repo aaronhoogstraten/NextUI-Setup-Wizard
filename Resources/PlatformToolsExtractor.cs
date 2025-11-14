@@ -31,14 +31,16 @@ namespace NextUI_Setup_Wizard.Resources
         {
             get
             {
-                var adbName = Utils.CurrentOS == OSType.Windows ? "adb.exe" : "adb";
+                var adbName = Utils.CurrentOS == OSType.Windows
+                    ? Constants.ADB_EXECUTABLE_WINDOWS
+                    : Constants.ADB_EXECUTABLE_UNIX;
                 if (_usingExistingPath)
                 {
                     return Path.Combine(_extractionPath, adbName);
                 }
                 else
                 {
-                    return Path.Combine(_extractionPath, "platform-tools", adbName);
+                    return Path.Combine(_extractionPath, Constants.PLATFORM_TOOLS_DIR, adbName);
                 }
             }
         }
@@ -63,7 +65,7 @@ namespace NextUI_Setup_Wizard.Resources
                 // Check for Homebrew installation on macOS (Apple Silicon only)
                 if (Utils.CurrentOS == OSType.Mac)
                 {
-                    var basePath = "/opt/homebrew/Caskroom/android-platform-tools";
+                    var basePath = Constants.HOMEBREW_ANDROID_PLATFORM_TOOLS_PATH;
 
                     if (Directory.Exists(basePath))
                     {
@@ -73,10 +75,10 @@ namespace NextUI_Setup_Wizard.Resources
                         var versionDirs = Directory.GetDirectories(basePath);
                         foreach (var versionDir in versionDirs)
                         {
-                            var platformToolsPath = Path.Combine(versionDir, "platform-tools");
+                            var platformToolsPath = Path.Combine(versionDir, Constants.PLATFORM_TOOLS_DIR);
                             if (Directory.Exists(platformToolsPath))
                             {
-                                var adbPath = Path.Combine(platformToolsPath, "adb");
+                                var adbPath = Path.Combine(platformToolsPath, Constants.ADB_EXECUTABLE_UNIX);
                                 if (File.Exists(adbPath))
                                 {
                                     Logger.LogImmediate("macOS homebrew adb exists");
@@ -111,7 +113,9 @@ namespace NextUI_Setup_Wizard.Resources
                 if (string.IsNullOrEmpty(existingPath) || !Directory.Exists(existingPath))
                     return false;
 
-                var adbName = Utils.CurrentOS == OSType.Windows ? "adb.exe" : "adb";
+                var adbName = Utils.CurrentOS == OSType.Windows
+                    ? Constants.ADB_EXECUTABLE_WINDOWS
+                    : Constants.ADB_EXECUTABLE_UNIX;
                 var adbPath = Path.Combine(existingPath, adbName);
 
                 if (!File.Exists(adbPath))
@@ -209,8 +213,12 @@ namespace NextUI_Setup_Wizard.Resources
                     var fileName = Path.GetFileName(file);
 
                     // Set executable permissions for common tools
-                    if (fileName == "adb" || fileName == "fastboot" || fileName == "aapt" ||
-                        fileName == "aidl" || fileName == "dexdump" || fileName == "split-select" ||
+                    if (fileName == Constants.ADB_EXECUTABLE_UNIX ||
+                        fileName == Constants.FASTBOOT_EXECUTABLE ||
+                        fileName == Constants.AAPT_EXECUTABLE ||
+                        fileName == Constants.AIDL_EXECUTABLE ||
+                        fileName == Constants.DEXDUMP_EXECUTABLE ||
+                        fileName == Constants.SPLIT_SELECT_EXECUTABLE ||
                         fileName.StartsWith("lib") || !Path.HasExtension(fileName))
                     {
                         using var process = new System.Diagnostics.Process
@@ -326,12 +334,13 @@ namespace NextUI_Setup_Wizard.Resources
 
                 foreach (var entry in archive.Entries)
                 {
-                    if (entry.FullName.Contains("platform-tools/"))
+                    if (entry.FullName.Contains($"{Constants.PLATFORM_TOOLS_DIR}/"))
                     {
                         hasPlatformToolsDir = true;
                     }
 
-                    if (entry.Name == "adb" || entry.Name == "adb.exe")
+                    if (entry.Name == Constants.ADB_EXECUTABLE_UNIX ||
+                        entry.Name == Constants.ADB_EXECUTABLE_WINDOWS)
                     {
                         hasAdb = true;
                     }

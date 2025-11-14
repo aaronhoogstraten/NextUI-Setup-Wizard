@@ -7,9 +7,7 @@ namespace NextUI_Setup_Wizard.Resources
 {
     public class Logger : IDisposable
     {
-        private const string LogFileName = "NextUI-Setup-Wizard.log";
-        private const string PrevLogFileName = "NextUI-Setup-Wizard_previous.log";
-        private static readonly string LogPath = Path.Combine(FileSystem.CacheDirectory, LogFileName);
+        private static readonly string LogPath = Path.Combine(FileSystem.CacheDirectory, Constants.LOG_FILE_NAME);
 
         private readonly StringBuilder _messages = new();
 
@@ -51,8 +49,8 @@ namespace NextUI_Setup_Wizard.Resources
             try
             {
                 var cacheDirectory = FileSystem.CacheDirectory;
-                var currentLogPath = Path.Combine(cacheDirectory, LogFileName);
-                var prevLogPath = Path.Combine(cacheDirectory, PrevLogFileName);
+                var currentLogPath = Path.Combine(cacheDirectory, Constants.LOG_FILE_NAME);
+                var prevLogPath = Path.Combine(cacheDirectory, Constants.PREVIOUS_LOG_FILE_NAME);
 
                 // If current log exists, rotate it
                 if (File.Exists(currentLogPath))
