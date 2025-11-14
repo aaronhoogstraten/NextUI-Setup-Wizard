@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,10 +14,22 @@ namespace NextUI_Setup_Wizard.Resources
     /// <summary>
     /// Service for executing ADB commands and managing device connections
     /// </summary>
-    public class AdbService
+    public partial class AdbService
     {
         private readonly string _adbExecutablePath;
         private readonly int _defaultTimeoutMs = 30000; // 30 seconds
+
+        /// <summary>
+        /// Regex source generator for stripping ANSI color codes
+        /// </summary>
+        [GeneratedRegex(@"\x1B\[[0-9;]*[a-zA-Z]")]
+        private static partial Regex AnsiCodesRegex();
+
+        /// <summary>
+        /// Regex source generator for validating MD5 hash format
+        /// </summary>
+        [GeneratedRegex("^[0-9a-f]{32}$")]
+        private static partial Regex Md5HashRegex();
 
         /// <summary>
         /// Event fired when an ADB command is executed for real-time logging
@@ -298,8 +311,8 @@ namespace NextUI_Setup_Wizard.Resources
                 return input;
 
             // Remove ANSI escape sequences (color codes, cursor movements, etc.)
-            // Pattern matches ESC[ followed by any characters up to and including a letter
-            return System.Text.RegularExpressions.Regex.Replace(input, @"\x1B\[[0-9;]*[a-zA-Z]", string.Empty);
+            // Uses compiled regex source generator for better performance
+            return AnsiCodesRegex().Replace(input, string.Empty);
         }
 
         /// <summary>
@@ -648,7 +661,8 @@ namespace NextUI_Setup_Wizard.Resources
                     {
                         var hash = parts[0].Trim().ToLowerInvariant();
                         // Validate that it looks like an MD5 hash (32 hex characters)
-                        if (hash.Length == 32 && System.Text.RegularExpressions.Regex.IsMatch(hash, "^[0-9a-f]{32}$"))
+                        // Uses compiled regex source generator for better performance
+                        if (hash.Length == 32 && Md5HashRegex().IsMatch(hash))
                         {
                             return hash;
                         }

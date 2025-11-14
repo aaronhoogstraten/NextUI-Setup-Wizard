@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.JSInterop;
 
@@ -11,8 +12,15 @@ namespace NextUI_Setup_Wizard.Resources
         Unsupported
     }
 
-    public static class Utils
+    public static partial class Utils
     {
+        /// <summary>
+        /// Regex source generator for sanitizing CSS selectors
+        /// Matches any character that is NOT alphanumeric, hyphen, or underscore
+        /// </summary>
+        [GeneratedRegex(@"[^a-zA-Z0-9\-_]")]
+        private static partial Regex InvalidSelectorCharsRegex();
+
         public static OSType CurrentOS
         {
             get
@@ -118,7 +126,8 @@ namespace NextUI_Setup_Wizard.Resources
             if (selectorType == SelectorType.DataRef || selectorType == SelectorType.CssClass)
             {
                 // Remove any characters that aren't alphanumeric, hyphen, or underscore
-                return System.Text.RegularExpressions.Regex.Replace(selector, @"[^a-zA-Z0-9\-_]", "");
+                // Uses compiled regex source generator for better performance
+                return InvalidSelectorCharsRegex().Replace(selector, "");
             }
 
             // For CssSelector, we still allow it but the user must be aware of the risks
