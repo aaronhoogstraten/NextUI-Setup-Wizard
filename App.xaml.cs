@@ -18,17 +18,17 @@ namespace NextUI_Setup_Wizard
 
         protected override Window CreateWindow(IActivationState? activationState)
         {
-            var window = new Window(new MainPage()) 
-            { 
+            var window = new Window(new MainPage())
+            {
                 Title = "NextUI Setup Wizard",
+                // Responsive window sizing - adapts to different screen sizes
                 Width = 1200,
                 Height = 800,
-                MinimumWidth = 1200,
-                MinimumHeight = 800,
-                MaximumWidth = 1200,
-                MaximumHeight = 800
+                MinimumWidth = 800,    // Allow smaller minimum for laptop screens
+                MinimumHeight = 600    // Allow smaller minimum for laptop screens
+                // No maximum constraints - allows user to maximize/resize as needed
             };
-            
+
             return window;
         }
     }
