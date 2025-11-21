@@ -530,7 +530,7 @@ namespace NextUI_Setup_Wizard.Resources
                         Error = "Command timed out"
                     });
 
-                    return Task.FromResult(timeoutResult);
+                    return timeoutResult;
                 }
 
                 var output = outputBuilder.ToString().Trim();
@@ -565,7 +565,7 @@ namespace NextUI_Setup_Wizard.Resources
                     ExitCode = process.ExitCode
                 });
 
-                return Task.FromResult(result);
+                return result;
             }
             catch (Exception ex)
             {
@@ -586,7 +586,7 @@ namespace NextUI_Setup_Wizard.Resources
                     Error = ex.Message
                 });
 
-                return Task.FromResult(exceptionResult);
+                return exceptionResult;
             }
         }
 
@@ -731,8 +731,8 @@ namespace NextUI_Setup_Wizard.Resources
 
                 using var sha1 = SHA1.Create();
                 using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
-                // FileStream is already configured for async, no need for Task.Run
-                var hashBytes = sha1.ComputeHash(fileStream);
+                // Use async hash computation for proper async/await pattern
+                var hashBytes = await sha1.ComputeHashAsync(fileStream);
                 return Convert.ToHexString(hashBytes).ToLowerInvariant();
             }
             catch (Exception ex)
@@ -756,8 +756,8 @@ namespace NextUI_Setup_Wizard.Resources
 
                 using var md5 = System.Security.Cryptography.MD5.Create();
                 using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
-                // FileStream is already configured for async, no need for Task.Run
-                var hashBytes = md5.ComputeHash(fileStream);
+                // Use async hash computation for proper async/await pattern
+                var hashBytes = await md5.ComputeHashAsync(fileStream);
                 return Convert.ToHexString(hashBytes).ToLowerInvariant();
             }
             catch (Exception ex)
