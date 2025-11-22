@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,10 +14,22 @@ namespace NextUI_Setup_Wizard.Resources
     /// <summary>
     /// Service for executing ADB commands and managing device connections
     /// </summary>
-    public class AdbService
+    public partial class AdbService
     {
         private readonly string _adbExecutablePath;
         private readonly int _defaultTimeoutMs = 30000; // 30 seconds
+
+        /// <summary>
+        /// Regex source generator for stripping ANSI color codes
+        /// </summary>
+        [GeneratedRegex(@"\x1B\[[0-9;]*[a-zA-Z]")]
+        private static partial Regex AnsiCodesRegex();
+
+        /// <summary>
+        /// Regex source generator for validating MD5 hash format
+        /// </summary>
+        [GeneratedRegex("^[0-9a-f]{32}$")]
+        private static partial Regex Md5HashRegex();
 
         /// <summary>
         /// Event fired when an ADB command is executed for real-time logging
@@ -38,8 +51,9 @@ namespace NextUI_Setup_Wizard.Resources
                 var result = await ExecuteAdbCommandAsync("version", timeout: 5000);
                 return result.IsSuccess && result.Output.Contains("Android Debug Bridge");
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"ADB availability check failed: {ex.Message}");
                 return false;
             }
         }
@@ -249,7 +263,8 @@ namespace NextUI_Setup_Wizard.Resources
                 // Use ls with -1 to force one entry per line and --color=never to prevent ANSI color codes
                 // If directoriesOnly is true, use -d */ to list only directories
                 var listCommand = directoriesOnly ? "ls -1 -d --color=never */" : "ls -1 --color=never";
-                var command = $"{deviceArg} shell \"cd \\\"{remotePath}\\\" && {listCommand}\"".Trim();
+                var escapedPath = EscapeShellArgument(remotePath);
+                var command = $"{deviceArg} shell \"cd {escapedPath} && {listCommand}\"".Trim();
 
                 var result = await ExecuteAdbCommandAsync(command);
 
@@ -296,8 +311,26 @@ namespace NextUI_Setup_Wizard.Resources
                 return input;
 
             // Remove ANSI escape sequences (color codes, cursor movements, etc.)
-            // Pattern matches ESC[ followed by any characters up to and including a letter
-            return System.Text.RegularExpressions.Regex.Replace(input, @"\x1B\[[0-9;]*[a-zA-Z]", string.Empty);
+            // Uses compiled regex source generator for better performance
+            return AnsiCodesRegex().Replace(input, string.Empty);
+        }
+
+        /// <summary>
+        /// Escapes a string for safe use in shell commands.
+        /// Uses single quotes and escapes any single quotes within the string.
+        /// This prevents shell injection attacks.
+        /// </summary>
+        /// <param name="input">The string to escape</param>
+        /// <returns>A shell-safe escaped string</returns>
+        private static string EscapeShellArgument(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return "''";
+
+            // Replace single quotes with '\'' (end quote, escaped quote, start quote)
+            // Then wrap the entire string in single quotes
+            // This is the safest method for POSIX shell escaping
+            return "'" + input.Replace("'", "'\\''") + "'";
         }
 
         /// <summary>
@@ -310,15 +343,16 @@ namespace NextUI_Setup_Wizard.Resources
             try
             {
                 var deviceArg = !string.IsNullOrEmpty(deviceId) ? $"-s {deviceId}" : "";
-                // Escape special characters in the path for shell
-                var escapedPath = remotePath.Replace("(", "\\(").Replace(")", "\\)");
-                var command = $"{deviceArg} shell test -e \"{escapedPath}\" && echo \"EXISTS\" || echo \"NOT_EXISTS\"".Trim();
+                // Properly escape the path for shell to prevent injection attacks
+                var escapedPath = EscapeShellArgument(remotePath);
+                var command = $"{deviceArg} shell test -e {escapedPath} && echo \"EXISTS\" || echo \"NOT_EXISTS\"".Trim();
 
                 var result = await ExecuteAdbCommandAsync(command);
                 return result.IsSuccess && result.Output.Contains("EXISTS");
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"PathExists check failed for '{remotePath}': {ex.Message}");
                 return false;
             }
         }
@@ -343,11 +377,15 @@ namespace NextUI_Setup_Wizard.Resources
                 if (lines.Length < 2)
                     return null;
 
-                var dataLine = lines.LastOrDefault(l => l.Contains(AdbFileOperations.NEXTUI_BASE_PATH) || l.Contains("storage") || !l.StartsWith("Filesystem"));
+                // Find the data line (not the header)
+                var dataLine = lines.LastOrDefault(l => l != null && (l.Contains(AdbFileOperations.NEXTUI_BASE_PATH) || l.Contains("storage") || !l.StartsWith("Filesystem")));
                 if (string.IsNullOrEmpty(dataLine))
                     return null;
 
                 var parts = dataLine.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts == null || parts.Length < 4)
+                    return null;
+
                 if (parts.Length >= 4)
                 {
                     if (long.TryParse(parts[1], out var totalKb) &&
@@ -375,7 +413,7 @@ namespace NextUI_Setup_Wizard.Resources
         /// <summary>
         /// Executes an ADB command
         /// </summary>
-        private Task<AdbResult> ExecuteAdbCommandAsync(
+        private async Task<AdbResult> ExecuteAdbCommandAsync(
             string arguments,
             IProgress<string>? progress = null,
             CancellationToken cancellationToken = default,
@@ -435,14 +473,47 @@ namespace NextUI_Setup_Wizard.Resources
                 process.BeginErrorReadLine();
 
                 var timeoutMs = timeout ?? _defaultTimeoutMs;
-                process.WaitForExit(timeoutMs);
-                var completed = process.HasExited;
+
+                // Use async wait with cancellation token for proper async/await pattern
+                using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(timeoutMs);
+
+                bool completed;
+                try
+                {
+                    await process.WaitForExitAsync(cts.Token);
+                    completed = true;
+                }
+                catch (OperationCanceledException)
+                {
+                    completed = false;
+                }
 
                 var executionTime = DateTime.Now - commandStartTime;
 
                 if (!completed)
                 {
-                    process.Kill();
+                    try
+                    {
+                        process.Kill();
+
+                        // Wait for process cleanup after kill (max 1 second)
+                        // This ensures proper resource disposal
+                        using var cleanupCts = new CancellationTokenSource(1000);
+                        try
+                        {
+                            await process.WaitForExitAsync(cleanupCts.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            // Process didn't exit cleanly within timeout
+                        }
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // Process already exited
+                    }
+
                     var timeoutResult = new AdbResult { IsSuccess = false, Error = "Command timed out" };
 
                     // Log timeout
@@ -459,7 +530,7 @@ namespace NextUI_Setup_Wizard.Resources
                         Error = "Command timed out"
                     });
 
-                    return Task.FromResult(timeoutResult);
+                    return timeoutResult;
                 }
 
                 var output = outputBuilder.ToString().Trim();
@@ -494,7 +565,7 @@ namespace NextUI_Setup_Wizard.Resources
                     ExitCode = process.ExitCode
                 });
 
-                return Task.FromResult(result);
+                return result;
             }
             catch (Exception ex)
             {
@@ -515,7 +586,7 @@ namespace NextUI_Setup_Wizard.Resources
                     Error = ex.Message
                 });
 
-                return Task.FromResult(exceptionResult);
+                return exceptionResult;
             }
         }
 
@@ -524,10 +595,20 @@ namespace NextUI_Setup_Wizard.Resources
         /// </summary>
         private static void ParseDeviceProperties(AdbDevice device, string properties)
         {
+            if (string.IsNullOrEmpty(properties))
+                return;
+
             var pairs = properties.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (pairs == null)
+                return;
+
             foreach (var pair in pairs)
             {
+                if (string.IsNullOrEmpty(pair))
+                    continue;
+
                 var colonIndex = pair.IndexOf(':');
+                // Ensure there's content before and after the colon
                 if (colonIndex > 0 && colonIndex < pair.Length - 1)
                 {
                     var key = pair.Substring(0, colonIndex);
@@ -567,7 +648,8 @@ namespace NextUI_Setup_Wizard.Resources
             // Try to use busybox md5sum on the device
             try
             {
-                var md5Command = $"{deviceArg} shell \"md5sum \\\"{remotePath}\\\"\"".Trim();
+                var escapedPath = EscapeShellArgument(remotePath);
+                var md5Command = $"{deviceArg} shell \"md5sum {escapedPath}\"".Trim();
                 var md5Result = await ExecuteAdbCommandAsync(md5Command, timeout: 10000);
 
                 if (md5Result.IsSuccess && !string.IsNullOrEmpty(md5Result.Output))
@@ -575,20 +657,22 @@ namespace NextUI_Setup_Wizard.Resources
                     // md5sum output format is typically: "hash  filename"
                     // Extract the hash (first part before whitespace)
                     var parts = md5Result.Output.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length > 0)
+                    if (parts != null && parts.Length > 0)
                     {
                         var hash = parts[0].Trim().ToLowerInvariant();
                         // Validate that it looks like an MD5 hash (32 hex characters)
-                        if (hash.Length == 32 && System.Text.RegularExpressions.Regex.IsMatch(hash, "^[0-9a-f]{32}$"))
+                        // Uses compiled regex source generator for better performance
+                        if (hash.Length == 32 && Md5HashRegex().IsMatch(hash))
                         {
                             return hash;
                         }
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
                 // If busybox md5sum fails, fall through to the pull method
+                Logger.LogImmediate($"Device-side MD5 calculation failed for '{remotePath}', falling back to pull method: {ex.Message}");
             }
 
             // Fallback: Pull file and compute hash locally
@@ -610,8 +694,9 @@ namespace NextUI_Setup_Wizard.Resources
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to pull file for MD5 hash calculation '{remotePath}': {ex.Message}");
                 return null;
             }
             finally
@@ -623,9 +708,10 @@ namespace NextUI_Setup_Wizard.Resources
                     {
                         File.Delete(tempFilePath);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Ignore cleanup failures
+                        // Log but don't fail on cleanup errors
+                        Logger.LogImmediate($"Failed to delete temporary file '{tempFilePath}': {ex.Message}");
                     }
                 }
             }
@@ -645,11 +731,13 @@ namespace NextUI_Setup_Wizard.Resources
 
                 using var sha1 = SHA1.Create();
                 using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
-                var hashBytes = await Task.Run(() => sha1.ComputeHash(fileStream));
+                // Use async hash computation for proper async/await pattern
+                var hashBytes = await sha1.ComputeHashAsync(fileStream);
                 return Convert.ToHexString(hashBytes).ToLowerInvariant();
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to compute SHA1 hash for '{filePath}': {ex.Message}");
                 return null;
             }
         }
@@ -668,11 +756,13 @@ namespace NextUI_Setup_Wizard.Resources
 
                 using var md5 = System.Security.Cryptography.MD5.Create();
                 using var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
-                var hashBytes = await Task.Run(() => md5.ComputeHash(fileStream));
+                // Use async hash computation for proper async/await pattern
+                var hashBytes = await md5.ComputeHashAsync(fileStream);
                 return Convert.ToHexString(hashBytes).ToLowerInvariant();
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to compute MD5 hash for '{filePath}': {ex.Message}");
                 return null;
             }
         }
@@ -705,8 +795,9 @@ namespace NextUI_Setup_Wizard.Resources
 
                 return null;
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to pull file for SHA1 hash calculation '{remotePath}': {ex.Message}");
                 return null;
             }
             finally
@@ -718,9 +809,10 @@ namespace NextUI_Setup_Wizard.Resources
                     {
                         File.Delete(tempFilePath);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Ignore cleanup failures
+                        // Log but don't fail on cleanup errors
+                        Logger.LogImmediate($"Failed to delete temporary file '{tempFilePath}': {ex.Message}");
                     }
                 }
             }

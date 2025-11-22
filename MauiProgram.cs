@@ -18,7 +18,8 @@ namespace NextUI_Setup_Wizard
 
             builder.Services.AddMauiBlazorWebView();
 
-            builder.Services.AddSingleton<HttpClient>();
+            // Use HttpClient factory pattern for better resource management
+            builder.Services.AddHttpClient();
 
             // Register ADB services
             builder.Services.AddSingleton<NextUI_Setup_Wizard.Resources.PlatformToolsExtractor>();

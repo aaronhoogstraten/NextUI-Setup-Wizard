@@ -16,3 +16,18 @@ window.setupClickOutside = (dotNetRef) => {
     // Add the new listener
     document.addEventListener('click', handleClick);
 };
+
+// Safe scroll function that doesn't use eval
+window.scrollToElement = (cssSelector, behavior, block) => {
+    try {
+        const element = document.querySelector(cssSelector);
+        if (element) {
+            element.scrollIntoView({
+                behavior: behavior || 'smooth',
+                block: block || 'center'
+            });
+        }
+    } catch (error) {
+        console.error('Failed to scroll to element:', error);
+    }
+};

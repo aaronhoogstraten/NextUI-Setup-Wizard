@@ -1,4 +1,5 @@
 using System;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.JSInterop;
 
@@ -11,8 +12,15 @@ namespace NextUI_Setup_Wizard.Resources
         Unsupported
     }
 
-    public static class Utils
+    public static partial class Utils
     {
+        /// <summary>
+        /// Regex source generator for sanitizing CSS selectors
+        /// Matches any character that is NOT alphanumeric, hyphen, or underscore
+        /// </summary>
+        [GeneratedRegex(@"[^a-zA-Z0-9\-_]")]
+        private static partial Regex InvalidSelectorCharsRegex();
+
         public static OSType CurrentOS
         {
             get
@@ -41,8 +49,9 @@ namespace NextUI_Setup_Wizard.Resources
                 if (!didOpen)
                     await Launcher.OpenAsync(directoryPath);
             }
-            catch
+            catch (Exception ex)
             {
+                Logger.LogImmediate($"Failed to open directory '{directoryPath}': {ex.Message}");
             }
         }
 
@@ -67,16 +76,63 @@ namespace NextUI_Setup_Wizard.Resources
             if (delay > 0)
                 await Task.Delay(delay);
 
+            // Validate behavior and block parameters to prevent injection
+            if (!IsValidScrollBehavior(behavior))
+                throw new ArgumentException($"Invalid scroll behavior: {behavior}", nameof(behavior));
+
+            if (!IsValidScrollBlock(block))
+                throw new ArgumentException($"Invalid scroll block: {block}", nameof(block));
+
+            // Sanitize selector based on type to prevent CSS injection
+            var sanitizedSelector = SanitizeSelector(selector, selectorType);
+
             var cssSelector = selectorType switch
             {
-                SelectorType.DataRef => $"[data-ref=\"{selector}\"]",
-                SelectorType.CssClass => $".{selector}",
-                SelectorType.CssSelector => selector,
+                SelectorType.DataRef => $"[data-ref=\"{sanitizedSelector}\"]",
+                SelectorType.CssClass => $".{sanitizedSelector}",
+                SelectorType.CssSelector => sanitizedSelector,
                 _ => throw new ArgumentException($"Unknown selector type: {selectorType}")
             };
 
-            await jsRuntime.InvokeVoidAsync("eval",
-                $"document.querySelector('{cssSelector}').scrollIntoView({{behavior: '{behavior}', block: '{block}'}});");
+            // Use dedicated JavaScript function instead of eval to prevent injection attacks
+            await jsRuntime.InvokeVoidAsync("scrollToElement", cssSelector, behavior, block);
+        }
+
+        /// <summary>
+        /// Validates that the scroll behavior is one of the allowed values
+        /// </summary>
+        private static bool IsValidScrollBehavior(string behavior)
+        {
+            return behavior == "smooth" || behavior == "auto" || behavior == "instant";
+        }
+
+        /// <summary>
+        /// Validates that the scroll block is one of the allowed values
+        /// </summary>
+        private static bool IsValidScrollBlock(string block)
+        {
+            return block == "start" || block == "center" || block == "end" || block == "nearest";
+        }
+
+        /// <summary>
+        /// Sanitizes a selector string to prevent CSS injection attacks
+        /// </summary>
+        private static string SanitizeSelector(string selector, SelectorType selectorType)
+        {
+            if (string.IsNullOrEmpty(selector))
+                return selector;
+
+            // For DataRef and CssClass, only allow alphanumeric, hyphens, and underscores
+            if (selectorType == SelectorType.DataRef || selectorType == SelectorType.CssClass)
+            {
+                // Remove any characters that aren't alphanumeric, hyphen, or underscore
+                // Uses compiled regex source generator for better performance
+                return InvalidSelectorCharsRegex().Replace(selector, "");
+            }
+
+            // For CssSelector, we still allow it but the user must be aware of the risks
+            // In practice, this is only used internally with known-safe selectors
+            return selector;
         }
 
         // Convenience methods for common scroll patterns

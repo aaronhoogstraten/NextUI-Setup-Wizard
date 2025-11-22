@@ -10,7 +10,7 @@
 @using NextUI_Setup_Wizard.Components.Shared
 @inject IJSRuntime JSRuntime
 @inject NavigationManager Navigation
-@inject HttpClient Http
+@inject IHttpClientFactory HttpClientFactory
 @inject PlatformToolsExtractor platformToolsExtractor
 @implements IDisposable
 
@@ -1170,9 +1170,11 @@
                         copyStatus = $"Downloading map.txt file for Arcade rom name mapping";
                         StateHasChanged();
 
-                        Http.DefaultRequestHeaders.Clear();
-                        Http.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
-                        var response = await Http.GetAsync("https://raw.githubusercontent.com/ryanmsartor/TrimUI-Brick-and-Smart-Pro-Custom-MinUI-Paks/refs/heads/main/Roms/Arcade%20(FBN)/map.txt");
+                        // Create HttpClient from factory for proper resource management
+                        using var httpClient = HttpClientFactory.CreateClient();
+                        httpClient.DefaultRequestHeaders.Clear();
+                        httpClient.DefaultRequestHeaders.Add("User-Agent", Constants.USER_AGENT_HEADER);
+                        var response = await httpClient.GetAsync("https://raw.githubusercontent.com/ryanmsartor/TrimUI-Brick-and-Smart-Pro-Custom-MinUI-Paks/refs/heads/main/Roms/Arcade%20(FBN)/map.txt");
 
                         if (response.IsSuccessStatusCode)
                         {

@@ -7,7 +7,7 @@
 @using CommunityToolkit.Maui.Storage
 @using NextUI_Setup_Wizard.Resources
 @using static NextUI_Setup_Wizard.Resources.Utils
-@inject HttpClient Http
+@inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
@@ -478,10 +478,12 @@
 
         try
         {
-            Http.DefaultRequestHeaders.Clear();
-            Http.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+            // Create HttpClient from factory for proper resource management
+            using var httpClient = HttpClientFactory.CreateClient();
+            httpClient.DefaultRequestHeaders.Clear();
+            httpClient.DefaultRequestHeaders.Add("User-Agent", Constants.USER_AGENT_HEADER);
 
-            var response = await Http.GetAsync("https://github.com/LoveRetro/NextUI/releases/latest");
+            var response = await httpClient.GetAsync("https://github.com/LoveRetro/NextUI/releases/latest");
 
             if (response.IsSuccessStatusCode)
             {
@@ -495,7 +497,7 @@
                 }
                 else if (!string.IsNullOrEmpty(latestRelease.TagName))
                 {
-                    response = await Http.GetAsync($"https://github.com/LoveRetro/NextUI/releases/expanded_assets/{latestRelease.TagName}");
+                    response = await httpClient.GetAsync($"https://github.com/LoveRetro/NextUI/releases/expanded_assets/{latestRelease.TagName}");
                     content = await response.Content.ReadAsStringAsync();
 
                     // Parse the actual -all.zip asset and its SHA256 from the expanded assets page
@@ -784,7 +786,9 @@
             // Download the zip file
             SetDownloadProgress("Downloading...", $"Downloading {allZipAsset.Name}");
 
-            using var response = await Http.GetAsync(allZipAsset.Url, HttpCompletionOption.ResponseHeadersRead);
+            // Create HttpClient from factory for proper resource management
+            using var httpClient = HttpClientFactory.CreateClient();
+            using var response = await httpClient.GetAsync(allZipAsset.Url, HttpCompletionOption.ResponseHeadersRead);
             response.EnsureSuccessStatusCode();
 
             var totalBytes = response.Content.Headers.ContentLength ?? 0;
